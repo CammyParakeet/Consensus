@@ -23,8 +23,8 @@ repositories {
 }
 
 dependencies {
-    paperweight.paperDevBundle("1.21.5-R0.1-SNAPSHOT")
-    compileOnly("io.papermc.paper:paper-api:1.21.5-R0.1-SNAPSHOT")
+    paperweight.paperDevBundle("1.21.8-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
 
     // Menus
     implementation("dev.triumphteam:triumph-gui-paper:4.0.0-SNAPSHOT")
@@ -59,7 +59,7 @@ tasks {
     }
 
     runServer {
-        minecraftVersion("1.21.6")
+        minecraftVersion("1.21.8")
     }
 
     withType<JavaCompile> {
@@ -80,12 +80,12 @@ configure<PaperPluginDescription> {
     version = "Git-${indraGit.commit()?.name?.take(7) ?: "unknown"}"
     //version = "1.0.0"
 
-    main = "com.glance.codex.platform.paper.ConsensusPlugin"
+    main = "com.glance.consensus.platform.paper.ConsensusPlugin"
 
 //    serverDependencies {
 //        create("PlaceholderAPI") {
 //            required = false
 //            load = PaperPluginDescription.RelativeLoadOrder.AFTER
 //        }
-//    }
+//    }op
 }

@@ -20,14 +20,12 @@ public class ConsensusPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        // todo config save/load
-
         PaperComponentScanner.scanAndInitialize(this, this.injector);
     }
 
     @Override
     public void onDisable() {
-        PaperComponentScanner.scanAndInitialize(this, this.injector);
+        PaperComponentScanner.scanAndCleanup(this, this.injector);
     }
 
 }

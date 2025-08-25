@@ -3,9 +3,11 @@ package com.glance.consensus.platform.paper.module;
 import com.glance.consensus.bootstrap.GuiceServiceLoader;
 import com.glance.consensus.platform.paper.commands.engine.CommandHandler;
 import com.glance.consensus.platform.paper.commands.engine.PaperCommandManager;
+import com.glance.consensus.platform.paper.polls.builder.PollBuildScreen;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import lombok.experimental.UtilityClass;
+import lombok.extern.slf4j.Slf4j;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
@@ -24,6 +26,7 @@ import java.util.logging.Logger;
  * </p>
  * @author Cammy
  */
+@Slf4j
 @UtilityClass
 public class PaperComponentScanner {
 

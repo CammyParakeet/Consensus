@@ -2,6 +2,8 @@ package com.glance.consensus.platform.paper.polls.builder.dialog;
 
 import io.papermc.paper.registry.data.dialog.input.SingleOptionDialogInput;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.TextColor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -9,7 +11,7 @@ import java.util.*;
 
 public final class DurationPresets {
 
-    private static final record Preset(String id, int minutes, Component display) {}
+    private record Preset(String id, int minutes, Component display) {}
 
     private static final List<Preset> PRESETS = List.of(
         new Preset("15m", 15, Component.text("15 Mins")),
@@ -26,7 +28,7 @@ public final class DurationPresets {
     public static @NotNull List<SingleOptionDialogInput.OptionEntry> asOptions(@Nullable String initialId) {
         List<SingleOptionDialogInput.OptionEntry> entries = new ArrayList<>();
         for (var p : PRESETS) {
-            Component display = p.display();
+            Component display = p.display().color(TextColor.color(224, 167, 34));
             boolean initial = p.id().equalsIgnoreCase(initialId);
             entries.add(SingleOptionDialogInput.OptionEntry.create(p.id(), display, initial));
         }
@@ -47,6 +49,10 @@ public final class DurationPresets {
                 .map(p -> p.id)
                 .findFirst()
                 .orElse("custom");
+    }
+
+    public static boolean isCustom(String preset) {
+        return preset.equalsIgnoreCase("custom");
     }
 
 }

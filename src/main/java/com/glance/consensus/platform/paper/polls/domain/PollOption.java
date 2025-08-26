@@ -1,5 +1,8 @@
 package com.glance.consensus.platform.paper.polls.domain;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 /**
  * Value object representing a single poll option
  *
@@ -18,13 +21,19 @@ package com.glance.consensus.platform.paper.polls.domain;
  *
  * @author Cammy
  */
-public record PollOption(int index, String labelRaw, int votes) {
+public record PollOption(
+    int index,
+    @NotNull String labelRaw,
+    @Nullable String tooltipRaw,
+    int votes
+) {
     /** Returns a copy with an absolute vote count */
     public PollOption withVotes(int newVotes) {
-        return new PollOption(index, labelRaw, newVotes);
+        return new PollOption(index, labelRaw, tooltipRaw, newVotes);
     }
     /** Returns a copy with {@code addedVotes} added to the current count */
     public PollOption withAddedVotes(int addedVotes) {
-        return new PollOption(index, labelRaw, this.votes + addedVotes);
+        return new PollOption(index, labelRaw, tooltipRaw, this.votes + addedVotes);
     }
+
 }

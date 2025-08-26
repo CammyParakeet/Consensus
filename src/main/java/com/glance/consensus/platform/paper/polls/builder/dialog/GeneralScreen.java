@@ -113,16 +113,16 @@ public final class GeneralScreen implements PollBuildScreen {
 
         // Duration
         String presetId = view.getText(K_PRESET_DURATION);
-        int finalMinutes;
-
         if (presetId == null || DurationPresets.isCustom(presetId)) {
             Float rawHrs = view.getFloat(K_CUSTOM_HOURS);
             Float rawMins = view.getFloat(K_CUSTOM_MINUTES);
             int hours = (int) Math.floor(rawHrs != null ? rawHrs : 0F);
             int mins = (int) Math.floor(rawMins != null ? rawMins : 0F);
-            finalMinutes = (hours * 60) + mins;
+
+            session.setCustomHours(hours);
+            session.setCustomMins(mins);
         } else {
-            finalMinutes = DurationPresets.minutesFor(presetId).orElse(5);
+            session.setDurationPresetId(presetId);
         }
 
         // Answer flags
@@ -139,7 +139,6 @@ public final class GeneralScreen implements PollBuildScreen {
 
         // Update session
         session.setQuestionRaw(question);
-        session.setDurationMinutes(finalMinutes);
         session.setMultipleChoice(multiple);
         session.setMaxSelections(maxSel);
         session.setAllowResubmission(allowResubmit);
@@ -201,8 +200,9 @@ public final class GeneralScreen implements PollBuildScreen {
             @NotNull PollBuildSession session
     ) {
         var durationOptions = DurationPresets.asOptions(
-            DurationPresets.bestMatchId(session.getDurationMinutes())
+                session.getDurationPresetId()
         );
+        boolean isCustom = DurationPresets.isCustom(session.getDurationPresetId());
 
         return List.of(
             DialogInput.text(K_QUESTION, Component.text("Poll Question to Ask"))
@@ -220,12 +220,12 @@ public final class GeneralScreen implements PollBuildScreen {
             // todo parse hrs and mins from custom mins
             DialogInput.numberRange(K_CUSTOM_HOURS, Component.text("Custom Hours"),
                     0, 168)
-                    .initial(0F)
+                    .initial(isCustom ? session.getCustomHours() : 0F)
                     .step(1F)
                     .build(),
 
             DialogInput.numberRange(K_CUSTOM_MINUTES, Component.text("Custom Minutes"), 0, 59)
-                    .initial(5F)
+                    .initial(isCustom ? session.getCustomMins() : 0F)
                     .step(1F)
                     .build(),
 

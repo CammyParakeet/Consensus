@@ -61,42 +61,42 @@ public final class OverrideScreen implements PollBuildScreen {
                 .body(List.of(
                         DialogBody.item(getOverrideIcon()).build(),
                         DialogBody.plainMessage(
-                            Component.text("You already have an in-progress poll!")
+                            Component.text("Looks like you have an unfinished poll!")
                                 .color(NamedTextColor.DARK_AQUA)),
                         DialogBody.plainMessage(
-                            Component.text("Continue editing it, or start a new one?"))
+                            Component.text("Continue where you left off, or begin a new one?"))
                 ))
                 .build())
             .type(DialogType.confirmation(
-                    ActionButton.create(
+                ActionButton.create(
                         Component.text("Resume"),
                         Component.text("Click to resume your current Poll Builder"),
                         180,
                         DialogAction.customClick((view, audience) -> {
-                            audience.closeDialog();
-                            this.navigator.open(player, PollBuildSession.Stage.GENERAL);
-                        },
-                        ClickCallback.Options.builder()
-                            .uses(1)
-                            .lifetime(ClickCallback.DEFAULT_LIFETIME)
-                            .build()
+                                    audience.closeDialog();
+                                    this.navigator.open(player, PollBuildSession.Stage.GENERAL);
+                                },
+                                ClickCallback.Options.builder()
+                                        .uses(1)
+                                        .lifetime(ClickCallback.DEFAULT_LIFETIME)
+                                        .build()
                         )
-                    ),
-                    ActionButton.create(
-                        Component.text("Start New"),
-                        Component.text("Click to discard your current Poll Builder"),
-                        180,
-                        DialogAction.customClick((view, audience) -> {
-                            audience.closeDialog();
-                            this.navigator.clear(player.getUniqueId());
-                            this.navigator.open(player, PollBuildSession.Stage.GENERAL);
-                        },
-                        ClickCallback.Options.builder()
-                            .uses(1)
-                            .lifetime(ClickCallback.DEFAULT_LIFETIME)
-                            .build()
-                        )
+                ),
+                ActionButton.create(
+                    Component.text("Start New"),
+                    Component.text("This will override your existing Poll Builder"),
+                    180,
+                    DialogAction.customClick((view, audience) -> {
+                        audience.closeDialog();
+                        this.navigator.clear(player.getUniqueId());
+                        this.navigator.open(player, PollBuildSession.Stage.GENERAL);
+                    },
+                    ClickCallback.Options.builder()
+                        .uses(1)
+                        .lifetime(ClickCallback.DEFAULT_LIFETIME)
+                        .build()
                     )
+                )
             ))
         );
 

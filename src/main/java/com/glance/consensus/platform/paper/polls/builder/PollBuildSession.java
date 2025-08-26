@@ -1,5 +1,6 @@
 package com.glance.consensus.platform.paper.polls.builder;
 
+import com.glance.consensus.platform.paper.polls.builder.dialog.DurationPresets;
 import com.glance.consensus.platform.paper.polls.domain.PollOption;
 import com.glance.consensus.utils.StringUtils;
 import lombok.Data;
@@ -22,7 +23,10 @@ public final class PollBuildSession {
     private Stage stage = Stage.GENERAL;
 
     private String questionRaw = "";
-    private int durationMinutes = 60;
+
+    private @Nullable String durationPresetId = "1h";
+    private int customHours = 0;
+    private int customMins = 0;
 
     private final List<PollOption> options = new ArrayList<>();
 
@@ -94,6 +98,18 @@ public final class PollBuildSession {
             var o = options.get(i);
             if (o.index() != i) options.set(i, new PollOption(i, o.labelRaw(), o.tooltipRaw(), o.votes()));
         }
+    }
+
+    private int resolveDurationMins() {
+        if (usingPresetDuration()) {
+            assert durationPresetId != null;
+            return DurationPresets.minutesFor(durationPresetId).orElse(5);
+        }
+        return Math.max(0, customHours) * (60 + Math.max(0, Math.min(59, customMins)));
+    }
+
+    private boolean usingPresetDuration() {
+        return durationPresetId != null && !durationPresetId.isBlank();
     }
 
 

@@ -29,10 +29,11 @@ public final class DurationPresets {
     private DurationPresets() {}
 
     public static @NotNull List<SingleOptionDialogInput.OptionEntry> asOptions(@Nullable String initialId) {
+        String cleanedInitial = initialId != null ? initialId : "custom";
         List<SingleOptionDialogInput.OptionEntry> entries = new ArrayList<>();
         for (var p : PRESETS) {
             Component display = p.display().color(TextColor.color(224, 167, 34));
-            boolean initial = p.id().equalsIgnoreCase(initialId);
+            boolean initial = p.id().equalsIgnoreCase(cleanedInitial);
             entries.add(SingleOptionDialogInput.OptionEntry.create(p.id(), display, initial));
         }
         return entries;
@@ -54,8 +55,8 @@ public final class DurationPresets {
                 .orElse("custom");
     }
 
-    public static boolean isCustom(String preset) {
-        return preset.equalsIgnoreCase("custom");
+    public static boolean isCustom(@Nullable String preset) {
+        return preset == null || preset.equalsIgnoreCase("custom");
     }
 
 }

@@ -30,6 +30,8 @@ public final class PollBuildSession {
     private int maxSelections = 1; // capped to 1 if multipleChoice = false, and to MAX_OPTIONS
     private boolean allowResubmission = false; // only respected for single-answer polls
 
+    private int editingIndex = 0;
+
     /** When true, creation is locked (after confirmation) to avoid double submissions */
     private boolean creating = false;
 

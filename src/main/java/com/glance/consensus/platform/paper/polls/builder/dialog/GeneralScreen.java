@@ -64,6 +64,8 @@ public final class GeneralScreen implements PollBuildScreen {
         @NotNull Player player,
         @NotNull PollBuildSession session
     ) {
+        session.setEditingIndex(session.optionCount());
+
         var dialog = Dialog.create(b -> b.empty()
             .base(DialogBase.builder(Component.text("Poll Builder (General)"))
                 .body(List.of(
@@ -84,21 +86,10 @@ public final class GeneralScreen implements PollBuildScreen {
                 120,
                 DialogAction.customClick((v, a) -> {
                     if (!(a instanceof Player p)) return;
-                    handleCreation(session, v, p);
+                    updateSession(session, v, p);
                 }, ClickCallback.Options.builder()
                         .uses(1)
                         .lifetime(ClickCallback.DEFAULT_LIFETIME).build())
-                ))
-                .exitAction(ActionButton.create(
-                                Component.text("Oink?"),
-                                Component.text("Click to submit this poll!"),
-                                120,
-                                DialogAction.customClick((v, a) -> {
-                                    if (!(a instanceof Player p)) return;
-                                    handleCreation(session, v, p);
-                                }, ClickCallback.Options.builder()
-                                        .uses(1)
-                                        .lifetime(ClickCallback.DEFAULT_LIFETIME).build())
                 ))
                 .columns(1)
                 .build()
@@ -108,7 +99,7 @@ public final class GeneralScreen implements PollBuildScreen {
         player.showDialog(dialog);
     }
 
-    private void handleCreation(
+    private void updateSession(
         @NotNull PollBuildSession session,
         @NotNull DialogResponseView view,
         @NotNull Player player
@@ -152,8 +143,6 @@ public final class GeneralScreen implements PollBuildScreen {
         session.setMultipleChoice(multiple);
         session.setMaxSelections(maxSel);
         session.setAllowResubmission(allowResubmit);
-
-        // todo actual submission
     }
 
     private List<ActionButton> getPollOptionButtons(@NotNull PollBuildSession session) {
@@ -174,12 +163,14 @@ public final class GeneralScreen implements PollBuildScreen {
                 tooltip = OPTION_EDIT_SUFFIX;
             }
 
-            Component display = Component.text("Answer " + (idx + 1) + ": ", NamedTextColor.GRAY).append(label);
+            Component display = Component.text("Answer " + (idx + 1) + ": ", NamedTextColor.GRAY)
+                    .append(label).color(NamedTextColor.WHITE);
 
-            buttons.add(ActionButton.create(display, tooltip, 250,
+            buttons.add(ActionButton.create(display, tooltip, 256,
                     DialogAction.customClick((v, a) -> {
                         if (!(a instanceof Player p)) return;
-                        // todo set option index data
+                        updateSession(session, v, p);
+                        session.setEditingIndex(idx);
                         navigator.open(p, PollBuildSession.Stage.OPTIONS);
                     }, ClickCallback.Options.builder()
                             .uses(1)
@@ -187,11 +178,13 @@ public final class GeneralScreen implements PollBuildScreen {
         }
 
         var addNew = ActionButton.create(
-                Component.text("Add Poll Answer", TextColor.color(219, 219, 219)),
+                Component.text("Add Poll Answer", TextColor.fromHexString("#a6a6a6")),
                 Component.text("Click to add a New Poll Answer!"),
-                160,
+                256,
                 DialogAction.customClick((v, a) -> {
-                    if (a instanceof Player p) this.navigator.open(p, PollBuildSession.Stage.OPTIONS);
+                    if (!(a instanceof Player p)) return;
+                    updateSession(session, v, p);
+                    this.navigator.open(p, PollBuildSession.Stage.OPTIONS);
                 }, ClickCallback.Options.builder()
                         .uses(1).lifetime(ClickCallback.DEFAULT_LIFETIME).build())
         );
@@ -213,7 +206,7 @@ public final class GeneralScreen implements PollBuildScreen {
 
         return List.of(
             DialogInput.text(K_QUESTION, Component.text("Poll Question to Ask"))
-                    .initial("My new poll")
+                    .initial(session.getQuestionRaw() != null ? session.getQuestionRaw() : "My new poll")
                     .labelVisible(true)
                     .width(300)
                     .maxLength(48)
@@ -224,7 +217,8 @@ public final class GeneralScreen implements PollBuildScreen {
                     .labelVisible(true)
                     .build(),
 
-            DialogInput.numberRange(K_CUSTOM_HOURS, Component.text("Custom Hours (0-7 Days)"),
+            // todo parse hrs and mins from custom mins
+            DialogInput.numberRange(K_CUSTOM_HOURS, Component.text("Custom Hours"),
                     0, 168)
                     .initial(0F)
                     .step(1F)

@@ -1,3 +1,4 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import net.minecrell.pluginyml.paper.PaperPluginDescription
 import xyz.jpenilla.runpaper.task.RunServer
 
@@ -39,6 +40,8 @@ dependencies {
     annotationProcessor("com.google.auto.service:auto-service:1.1.1")
     compileOnly("com.google.auto.service:auto-service-annotations:1.1.1")
 
+    implementation("com.github.ben-manes.caffeine:caffeine:3.2.2")
+
     // PAPI
     //compileOnly("me.clip:placeholderapi:2.11.6")
 
@@ -71,6 +74,10 @@ tasks {
 
 tasks.named<RunServer>("runServer") {
     systemProperty("com.mojang.eula.agree", "true")
+}
+
+tasks.named<ShadowJar>("shadowJar") {
+    relocate("com.github.benmanes.caffeine", "com.glance.consensus.libs.caffeine")
 }
 
 configure<PaperPluginDescription> {

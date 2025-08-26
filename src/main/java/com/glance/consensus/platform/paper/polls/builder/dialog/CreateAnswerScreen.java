@@ -64,7 +64,7 @@ public final class CreateAnswerScreen implements PollBuildScreen {
                         .hoverEvent(HoverEvent.showText(buildFormattingHelp()))),
                     DialogBody.plainMessage(Component.empty())
                 ))
-                .inputs(getInputs())
+                .inputs(getInputs(session))
                 .build())
             .type(DialogType.confirmation(
                 ActionButton.create(
@@ -85,7 +85,7 @@ public final class CreateAnswerScreen implements PollBuildScreen {
 
                         // todo index stuff
 
-                        session.addOption(answer, tooltip);
+                        session.upsertOption(session.getEditingIndex(), answer, tooltip);
                         this.navigator.open(p, PollBuildSession.Stage.GENERAL);
                     }, ClickCallback.Options.builder()
                             .uses(1).lifetime(ClickCallback.DEFAULT_LIFETIME).build())
@@ -105,18 +105,28 @@ public final class CreateAnswerScreen implements PollBuildScreen {
         player.showDialog(dialog);
     }
 
-    private List<DialogInput> getInputs() {
+    private List<DialogInput> getInputs(@NotNull PollBuildSession session) {
+        String currentLabel = "";
+        String currentTooltip = "";
+
+        int editingIndex = session.getEditingIndex();
+        if (editingIndex < session.optionCount()) {
+            var option = session.getOptions().get(session.getEditingIndex());
+            currentLabel = option.labelRaw();
+            currentTooltip = option.tooltipRaw();
+        }
+
         return List.of(
             DialogInput.text(K_ANSWER, Component.text("Answer")
                     .hoverEvent(HoverEvent.showText(Component.text("Supports MiniMessage Tags"))))
-                .initial("")
+                .initial(currentLabel)
                 .labelVisible(true)
                 .width(300)
                 .maxLength(96)
                 .build(),
 
             DialogInput.text(K_HOVER_TEXT, Component.text("Answer Tooltip"))
-                .initial("")
+                .initial(currentTooltip)
                 .labelVisible(true)
                 .width(300)
                 .maxLength(512)

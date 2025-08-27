@@ -24,10 +24,12 @@ import java.util.UUID;
 public final class Poll {
 
     private final UUID id;
+    private final UUID owner;
     private final String questionRaw; // MiniMessage supported
     private final Instant createdAt;
     private final Instant closesAt;
     private final List<PollOption> options;
-    private volatile boolean closed;
+    private final PollRules rules;
+    private volatile boolean closed = false;
 
 }

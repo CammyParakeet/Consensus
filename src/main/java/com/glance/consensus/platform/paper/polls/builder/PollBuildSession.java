@@ -100,12 +100,14 @@ public final class PollBuildSession {
         }
     }
 
-    private int resolveDurationMins() {
+    public int resolveDurationMins() {
         if (usingPresetDuration()) {
             assert durationPresetId != null;
             return DurationPresets.minutesFor(durationPresetId).orElse(5);
         }
-        return Math.max(0, customHours) * (60 + Math.max(0, Math.min(59, customMins)));
+        int hours = Math.max(0, customHours);
+        int mins  = Math.max(0, Math.min(59, customMins));
+        return hours * 60 + mins;
     }
 
     private boolean usingPresetDuration() {

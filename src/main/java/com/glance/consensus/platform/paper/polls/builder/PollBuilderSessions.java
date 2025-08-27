@@ -12,6 +12,11 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Manages ephemeral {@link PollBuildSession} objects for players
+ * <p>
+ * Ensures each player has at most one active session at a time
+ */
 @Singleton
 @AutoService(Manager.class)
 public final class PollBuilderSessions implements Manager {
@@ -26,18 +31,41 @@ public final class PollBuilderSessions implements Manager {
                 .build();
     }
 
+    /**
+     * Gets an existing build session for a player, or creates one if absent
+     *
+     * @param playerId the player id
+     * @return the session
+     */
     public PollBuildSession getOrCreate(@NotNull UUID playerId) {
         return sessions.get(playerId, PollBuildSession::new);
     }
 
+    /**
+     * Gets the current session for a player if present
+     *
+     * @param playerId the player id
+     * @return optional session
+     */
     public Optional<PollBuildSession> get(@NotNull UUID playerId) {
         return Optional.ofNullable(sessions.getIfPresent(playerId));
     }
 
+    /**
+     * Clears a player's build session immediately
+     *
+     * @param playerId the player id
+     */
     public void clear(@NotNull UUID playerId) {
         sessions.invalidate(playerId);
     }
 
+    /**
+     * Checks if a player currently has a build session
+     *
+     * @param playerId the player id
+     * @return true if present
+     */
     public boolean has(@NotNull UUID playerId) {
         return sessions.getIfPresent(playerId) != null;
     }

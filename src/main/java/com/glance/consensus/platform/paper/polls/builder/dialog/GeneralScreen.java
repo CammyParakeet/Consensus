@@ -3,6 +3,8 @@ package com.glance.consensus.platform.paper.polls.builder.dialog;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildScreen;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildSession;
+import com.glance.consensus.platform.paper.polls.runtime.PollManager;
+import com.glance.consensus.platform.paper.utils.Mini;
 import com.google.auto.service.AutoService;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
@@ -32,6 +34,7 @@ import java.util.List;
 public final class GeneralScreen implements PollBuildScreen {
 
     private final PollBuildNavigator navigator;
+    private final PollManager pollManager;
 
     private static final String K_QUESTION = "poll_question";
     private static final String K_PRESET_DURATION = "duration_preset";
@@ -44,14 +47,16 @@ public final class GeneralScreen implements PollBuildScreen {
 
     private static final String K_BUMP_DELTA = "delta";
 
-    private static final Component OPTION_EDIT_SUFFIX = PollBuildScreen.parseMini(
+    private static final Component OPTION_EDIT_SUFFIX = Mini.parseMini(
             "<gold>[</gold><#0d9fbd>Click to edit this answer<gold>]");
 
     @Inject
     public GeneralScreen(
-        @NotNull final PollBuildNavigator navigator
+        @NotNull final PollBuildNavigator navigator,
+        @NotNull final PollManager pollManager
     ) {
        this.navigator = navigator;
+       this.pollManager = pollManager;
     }
 
     @Override
@@ -151,10 +156,10 @@ public final class GeneralScreen implements PollBuildScreen {
             final int idx = i;
             var opt = session.getOptions().get(i);
 
-            var label = PollBuildScreen.parseMini(opt.labelRaw());
+            var label = Mini.parseMini(opt.labelRaw());
             Component tooltip;
             if (opt.tooltipRaw() != null && !opt.tooltipRaw().isBlank()) {
-                tooltip = PollBuildScreen.parseMini(opt.tooltipRaw())
+                tooltip = Mini.parseMini(opt.tooltipRaw())
                         .appendNewline()
                         .appendNewline()
                         .append(OPTION_EDIT_SUFFIX);

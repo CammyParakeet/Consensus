@@ -3,6 +3,8 @@ package com.glance.consensus.platform.paper.module;
 import com.glance.consensus.platform.paper.polls.builder.DefaultPollBuilderNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuilderSessions;
+import com.glance.consensus.platform.paper.polls.runtime.DefaultPollManager;
+import com.glance.consensus.platform.paper.polls.runtime.PollManager;
 import com.google.inject.AbstractModule;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -23,6 +25,7 @@ public final class ConsensusModule extends AbstractModule {
 
         this.bind(PollBuilderSessions.class);
         this.bind(PollBuildNavigator.class).to(DefaultPollBuilderNavigator.class).asEagerSingleton();
+        this.bind(PollManager.class).to(DefaultPollManager.class).asEagerSingleton();
 
         install(new PollBuilderWizardModule(plugin));
     }

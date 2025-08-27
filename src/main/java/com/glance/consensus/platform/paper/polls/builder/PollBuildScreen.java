@@ -6,10 +6,34 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
+/**
+ * Represents a single UI screen within the poll-building wizard
+ * <p>
+ * Each screen corresponds to one {@link PollBuildSession.Stage} and is
+ * responsible for rendering its dialog and updating the session state
+ *
+ * @author Cammy
+ */
 public interface PollBuildScreen {
+
+    /**
+     * @return the {@link PollBuildSession.Stage} this screen implements
+     */
     PollBuildSession.Stage stage();
+
+    /**
+     * Opens this screen's UI for the player
+     *
+     * @param player  the player to show the UI to
+     * @param session the player's build session
+     */
     void open(@NotNull Player player, @NotNull PollBuildSession session);
 
+    /**
+     * Builds a reference component showing basic MiniMessage formatting info
+     *
+     * @return a formatted component showing MiniMessage usage
+     */
     default Component buildFormattingHelp() {
         String raw = "<gold><b>Yes</b></gold> <gray>- select me!</gray>";
         Component rendered = MiniMessage.miniMessage().deserialize(raw);
@@ -42,7 +66,4 @@ public interface PollBuildScreen {
                 .build();
     }
 
-    static Component parseMini(@NotNull String raw) {
-        return MiniMessage.miniMessage().deserialize(raw);
-    }
 }

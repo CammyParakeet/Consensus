@@ -4,7 +4,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Value object representing a single poll option
+ * Value object representing a single poll option/answer
  *
  * <p>Fields:</p>
  * <ul>
@@ -21,19 +21,19 @@ import org.jetbrains.annotations.Nullable;
  *
  * @author Cammy
  */
-public record PollOption(
+public record PollAnswer(
     int index,
     @NotNull String labelRaw,
     @Nullable String tooltipRaw,
     int votes
 ) {
     /** Returns a copy with an absolute vote count */
-    public PollOption withVotes(int newVotes) {
-        return new PollOption(index, labelRaw, tooltipRaw, newVotes);
+    public PollAnswer withVotes(int newVotes) {
+        return new PollAnswer(index, labelRaw, tooltipRaw, newVotes);
     }
     /** Returns a copy with {@code addedVotes} added to the current count */
-    public PollOption withAddedVotes(int addedVotes) {
-        return new PollOption(index, labelRaw, tooltipRaw, this.votes + addedVotes);
+    public PollAnswer withAddedVotes(int addedVotes) {
+        return new PollAnswer(index, labelRaw, tooltipRaw, this.votes + addedVotes);
     }
 
 }

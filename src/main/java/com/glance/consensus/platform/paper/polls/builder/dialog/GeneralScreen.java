@@ -69,7 +69,7 @@ public final class GeneralScreen implements PollBuildScreen {
         @NotNull Player player,
         @NotNull PollBuildSession session
     ) {
-        session.setEditingIndex(session.optionCount());
+        session.setEditingIndex(session.answerCount());
 
         var dialog = Dialog.create(b -> b.empty()
             .base(DialogBase.builder(Component.text("Poll Builder (General)"))
@@ -112,7 +112,6 @@ public final class GeneralScreen implements PollBuildScreen {
         String question = view.getText(K_QUESTION);
         if (question == null || question.isBlank()) {
             player.sendMessage(Component.text("Poll Question Cannot Be Empty!", NamedTextColor.RED));
-            this.navigator.open(player, PollBuildSession.Stage.GENERAL);
             return;
         }
 
@@ -134,7 +133,7 @@ public final class GeneralScreen implements PollBuildScreen {
         Boolean multipleRaw = view.getBoolean(K_MULTI_CHOICE);
         boolean multiple = multipleRaw != null ? multipleRaw : false;
 
-        int optionCount = Math.max(1, session.optionCount());
+        int optionCount = Math.max(1, session.answerCount());
         Float maxSelRaw = view.getFloat(K_MAX_SELECTIONS);
         int maxSel = (int) Math.max(1, Math.min(optionCount, (maxSelRaw != null) ? maxSelRaw.intValue() : 1F));
         if (!multiple) maxSel = 1;
@@ -152,9 +151,9 @@ public final class GeneralScreen implements PollBuildScreen {
     private List<ActionButton> getPollOptionButtons(@NotNull PollBuildSession session) {
         List<ActionButton> buttons = new ArrayList<>();
 
-        for (int i = 0; i < session.optionCount(); i++) {
+        for (int i = 0; i < session.answerCount(); i++) {
             final int idx = i;
-            var opt = session.getOptions().get(i);
+            var opt = session.getAnswers().get(i);
 
             var label = Mini.parseMini(opt.labelRaw());
             Component tooltip;
@@ -175,20 +174,20 @@ public final class GeneralScreen implements PollBuildScreen {
                         if (!(a instanceof Player p)) return;
                         updateSession(session, v, p);
                         session.setEditingIndex(idx);
-                        navigator.open(p, PollBuildSession.Stage.OPTIONS);
+                        navigator.open(p, PollBuildSession.Stage.ANSWER);
                     }, ClickCallback.Options.builder()
                             .uses(1)
                             .lifetime(ClickCallback.DEFAULT_LIFETIME).build())));
         }
 
         var addNew = ActionButton.create(
-                Component.text("Add Poll Answer", TextColor.fromHexString("#a6a6a6")),
+                Component.text("Add Poll Answer", TextColor.fromHexString("#e5e5e5")),
                 Component.text("Click to add a New Poll Answer!"),
                 256,
                 DialogAction.customClick((v, a) -> {
                     if (!(a instanceof Player p)) return;
                     updateSession(session, v, p);
-                    this.navigator.open(p, PollBuildSession.Stage.OPTIONS);
+                    this.navigator.open(p, PollBuildSession.Stage.ANSWER);
                 }, ClickCallback.Options.builder()
                         .uses(1).lifetime(ClickCallback.DEFAULT_LIFETIME).build())
         );
@@ -239,7 +238,7 @@ public final class GeneralScreen implements PollBuildScreen {
                     .build(),
 
             DialogInput.numberRange(K_MAX_SELECTIONS, Component.text("Max Answers Per Voter"),
-                        1, Math.max(1, session.optionCount()))
+                        1, Math.max(1, session.answerCount()))
                     .initial(1F)
                     .step(1F)
                     .build(),

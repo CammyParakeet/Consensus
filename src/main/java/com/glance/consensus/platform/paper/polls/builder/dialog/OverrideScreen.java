@@ -3,7 +3,6 @@ package com.glance.consensus.platform.paper.polls.builder.dialog;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildScreen;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildSession;
-import com.glance.consensus.platform.paper.polls.builder.PollBuilderSessions;
 import com.google.auto.service.AutoService;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
@@ -64,7 +63,7 @@ public final class OverrideScreen implements PollBuildScreen {
                             Component.text("Looks like you have an unfinished poll!")
                                 .color(NamedTextColor.DARK_AQUA)),
                         DialogBody.plainMessage(
-                            Component.text("Continue where you left off, or begin a new one?"))
+                            Component.text("Continue where you left off\n or begin a new one?"))
                 ))
                 .build())
             .type(DialogType.confirmation(

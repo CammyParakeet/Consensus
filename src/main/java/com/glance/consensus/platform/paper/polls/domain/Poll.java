@@ -28,7 +28,7 @@ public final class Poll {
     private final String questionRaw; // MiniMessage supported
     private final Instant createdAt;
     private final Instant closesAt;
-    private final List<PollOption> options;
+    private final List<PollAnswer> options;
     private final PollRules rules;
     private volatile boolean closed = false;
 

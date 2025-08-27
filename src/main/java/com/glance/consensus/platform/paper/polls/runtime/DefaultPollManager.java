@@ -4,7 +4,7 @@ import com.glance.consensus.platform.paper.polls.builder.PollBuildNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildSession;
 import com.glance.consensus.platform.paper.polls.builder.PollBuilderSessions;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
-import com.glance.consensus.platform.paper.polls.domain.PollOption;
+import com.glance.consensus.platform.paper.polls.domain.PollAnswer;
 import com.glance.consensus.platform.paper.polls.domain.PollRules;
 import com.glance.consensus.utils.StringUtils;
 import com.google.auto.service.AutoService;
@@ -50,14 +50,14 @@ public class DefaultPollManager implements PollManager {
     ) throws IllegalArgumentException {
         String question = Objects.requireNonNullElse(session.getQuestionRaw(), "").trim();
         if (question.isBlank()) throw new IllegalArgumentException("Question cannot be empty");
-        if (session.getOptions().size() < 2) throw new IllegalArgumentException("At least 2 options are required");
+        if (session.getAnswers().size() < 2) throw new IllegalArgumentException("At least 2 options are required");
 
-        List<PollOption> normalized = new ArrayList<>();
-        for (int i = 0; i < session.getOptions().size(); i++) {
-            var option = session.getOptions().get(i);
+        List<PollAnswer> normalized = new ArrayList<>();
+        for (int i = 0; i < session.getAnswers().size(); i++) {
+            var option = session.getAnswers().get(i);
             String label = option.labelRaw().trim();
             if (label.isBlank()) throw new IllegalArgumentException("Option " + (i+1) + " has no label");
-            normalized.add(new PollOption(i, label, StringUtils.emptyToNull(option.tooltipRaw()), 0));
+            normalized.add(new PollAnswer(i, label, StringUtils.emptyToNull(option.tooltipRaw()), 0));
         }
 
         int minutes = Math.max(1, session.resolveDurationMins()); // min 1 minute

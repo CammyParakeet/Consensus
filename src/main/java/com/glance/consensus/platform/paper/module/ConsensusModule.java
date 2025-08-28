@@ -3,9 +3,12 @@ package com.glance.consensus.platform.paper.module;
 import com.glance.consensus.platform.paper.polls.builder.DefaultPollBuilderNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuilderSessions;
+import com.glance.consensus.platform.paper.polls.persistence.PollStorage;
+import com.glance.consensus.platform.paper.polls.persistence.config.PollStorageProvider;
 import com.glance.consensus.platform.paper.polls.runtime.DefaultPollManager;
 import com.glance.consensus.platform.paper.polls.runtime.PollManager;
 import com.google.inject.AbstractModule;
+import com.google.inject.Singleton;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.NotNull;
@@ -22,6 +25,8 @@ public final class ConsensusModule extends AbstractModule {
     protected void configure() {
         this.bind(Plugin.class).toInstance(plugin);
         this.bind(JavaPlugin.class).toInstance((JavaPlugin) plugin);
+
+        this.bind(PollStorage.class).toProvider(PollStorageProvider.class).in(Singleton.class);
 
         this.bind(PollBuilderSessions.class);
         this.bind(PollBuildNavigator.class).to(DefaultPollBuilderNavigator.class).asEagerSingleton();

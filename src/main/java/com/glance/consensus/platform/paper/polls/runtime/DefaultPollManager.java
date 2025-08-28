@@ -6,9 +6,11 @@ import com.glance.consensus.platform.paper.polls.builder.PollBuilderSessions;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.domain.PollAnswer;
 import com.glance.consensus.platform.paper.polls.domain.PollRules;
+import com.glance.consensus.platform.paper.polls.persistence.PollStorage;
 import com.glance.consensus.utils.StringUtils;
 import com.google.auto.service.AutoService;
 import com.google.inject.Inject;
+import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import org.bukkit.entity.Player;
@@ -18,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
@@ -31,22 +34,27 @@ public class DefaultPollManager implements PollManager {
     private final PollBuildNavigator navigator;
     private final PollBuilderSessions sessions;
 
+    // Storage
+    private final Provider<PollStorage> storageProvider;
+
     // Poll Cache
     private final Map<UUID, PollRuntime> polls = new ConcurrentHashMap<>();
 
     @Inject
     public DefaultPollManager(
-        @NotNull Plugin plugin,
-        @NotNull PollBuildNavigator navigator,
-        @NotNull PollBuilderSessions sessions
+        @NotNull final Plugin plugin,
+        @NotNull final PollBuildNavigator navigator,
+        @NotNull final PollBuilderSessions sessions,
+        @NotNull final Provider<PollStorage> storage
     ) {
         this.plugin = plugin;
         this.navigator = navigator;
         this.sessions = sessions;
+        this.storageProvider = storage;
     }
 
     @Override
-    public UUID createFromBuildSession(
+    public CompletableFuture<UUID> createFromBuildSession(
         @NotNull Player creator,
         @NotNull PollBuildSession session
     ) throws IllegalArgumentException {
@@ -74,12 +82,16 @@ public class DefaultPollManager implements PollManager {
         Instant closeAt = now.plus(Duration.ofMinutes(minutes));
 
         var poll = new Poll(id, creator.getUniqueId(), question, now, closeAt, normalized, rules);
-        var runtime = new PollRuntime(poll);
+        poll.setClosed(false);
 
-        log.warn("Created poll {}", poll);
-        polls.put(id, runtime);
+        return storageProvider.get().createPoll(poll).thenApply(p -> {
+            var runtime = new PollRuntime(poll);
 
-        return id;
+            log.warn("Created poll {}", poll);
+            polls.put(id, runtime);
+
+            return id;
+        });
     }
 
     @Override
@@ -107,7 +119,24 @@ public class DefaultPollManager implements PollManager {
 
     @Override
     public void onEnable() {
-        // todo populate a cache?
+        PollStorage storage = storageProvider.get();
+        if (storage == null) throw new IllegalStateException("A Storage system was not initialized");
+
+        storage.loadActivePolls().thenAccept(list -> {
+            for (Poll p : list) {
+                PollRuntime r = new PollRuntime(p);
+                // todo get tallies from storage
+//                storage.loadTallies(p.getId()).thenAccept(t -> {
+//                    // apply counts to runtime’s answers
+//                    var opts = p.getOptions();
+//                    for (int i = 0; i < opts.size(); i++) {
+//                        var a = opts.get(i);
+//                        opts.set(i, a.withVotes(t.getOrDefault(i, 0)));
+//                    }
+//                });
+                polls.put(p.getId(), r);
+            }
+        });
     }
 
     @Override

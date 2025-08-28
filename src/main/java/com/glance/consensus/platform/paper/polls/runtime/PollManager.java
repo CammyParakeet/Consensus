@@ -9,6 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Central service for managing the lifecycle of active polls
@@ -35,7 +36,7 @@ public interface PollManager extends Manager {
      * @return the unique id of the created poll
      * @throws IllegalArgumentException if the session is invalid (e.g. missing question or options)
      */
-    UUID createFromBuildSession(
+    CompletableFuture<UUID> createFromBuildSession(
         @NotNull Player creator,
         @NotNull PollBuildSession session
     ) throws IllegalArgumentException;

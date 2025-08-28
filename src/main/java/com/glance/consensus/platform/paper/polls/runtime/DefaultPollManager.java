@@ -1,5 +1,6 @@
 package com.glance.consensus.platform.paper.polls.runtime;
 
+import com.glance.consensus.platform.paper.module.Manager;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildSession;
 import com.glance.consensus.platform.paper.polls.builder.PollBuilderSessions;
@@ -25,8 +26,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Singleton
-@AutoService(PollManager.class)
-public class DefaultPollManager implements PollManager {
+@AutoService(Manager.class)
+public final class DefaultPollManager implements PollManager {
 
     private final Plugin plugin;
 
@@ -51,6 +52,15 @@ public class DefaultPollManager implements PollManager {
         this.navigator = navigator;
         this.sessions = sessions;
         this.storageProvider = storage;
+    }
+
+    @Override
+    public void startBuildSession(@NotNull Player player) {
+        if (this.sessions.has(player.getUniqueId())) {
+            this.navigator.open(player, PollBuildSession.Stage.OVERRIDE);
+            return;
+        }
+        this.navigator.open(player, PollBuildSession.Stage.GENERAL);
     }
 
     @Override
@@ -100,8 +110,12 @@ public class DefaultPollManager implements PollManager {
     }
 
     @Override
+    public Collection<PollRuntime> all() {
+        return polls.values();
+    }
+
+    @Override
     public Collection<PollRuntime> active() {
-        log.warn("Active poll? {}", polls);
         return polls.values().stream().filter(p -> !p.getPoll().isClosed()).toList();
     }
 
@@ -122,7 +136,9 @@ public class DefaultPollManager implements PollManager {
         PollStorage storage = storageProvider.get();
         if (storage == null) throw new IllegalStateException("A Storage system was not initialized");
 
+        log.warn("Loading active from onEnable");
         storage.loadActivePolls().thenAccept(list -> {
+            log.warn("Found '{}' polls from storage", list.size());
             for (Poll p : list) {
                 PollRuntime r = new PollRuntime(p);
                 // todo get tallies from storage

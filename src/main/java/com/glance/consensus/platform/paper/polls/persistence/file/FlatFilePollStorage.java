@@ -11,6 +11,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import lombok.extern.slf4j.Slf4j;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
@@ -25,6 +26,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 @Singleton
 public class FlatFilePollStorage implements PollStorage {
 
@@ -203,6 +205,7 @@ public class FlatFilePollStorage implements PollStorage {
 
     @Override
     public CompletableFuture<List<Poll>> loadActivePolls() {
+        log.warn("Loading active polls??");
         return CompletableFuture.supplyAsync(() -> {
             long now = System.currentTimeMillis();
             List<Poll> out = new ArrayList<>();

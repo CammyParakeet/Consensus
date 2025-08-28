@@ -93,7 +93,11 @@ public final class GeneralScreen implements PollBuildScreen {
                     if (!(a instanceof Player p)) return;
                     updateSession(session, v, p);
 
-                    this.pollManager.createFromBuildSession(player, session);
+                    try {
+                        this.pollManager.createFromBuildSession(player, session);
+                    } catch (Exception e) {
+                        player.sendMessage(e.getMessage());
+                    }
                 }, ClickCallback.Options.builder()
                         .uses(1)
                         .lifetime(ClickCallback.DEFAULT_LIFETIME).build())

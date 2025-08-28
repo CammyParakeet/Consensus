@@ -28,6 +28,8 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface PollManager extends Manager {
 
+    void startBuildSession(@NotNull Player player);
+
     /**
      * Creates a new {@link Poll} from a completed build session
      *
@@ -49,12 +51,20 @@ public interface PollManager extends Manager {
      */
     Optional<PollRuntime> get(@NotNull UUID pollId);
 
+    /** All known polls in memory (active + closed) */
+    Collection<PollRuntime> all();
+
     /**
      * Returns all currently active (open) polls
      *
      * @return collection of active polls
      */
     Collection<PollRuntime> active();
+
+    /** Convenience view of closed polls (derived from {@link #all()}) */
+    default Collection<PollRuntime> closed() {
+        return all().stream().filter(rt -> rt.getPoll().isClosed()).toList();
+    }
 
     /**
      * Closes a poll immediately

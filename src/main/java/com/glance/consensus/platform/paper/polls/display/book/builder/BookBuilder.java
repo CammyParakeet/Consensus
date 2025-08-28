@@ -44,6 +44,10 @@ public final class BookBuilder {
     public BookBuilder setAuthor(String author) { this.author = Component.text(author); return this; }
     public BookBuilder setAuthor(Component author) { this.author = author; return this; }
 
+    public BookBuilder addPage(List<Component> components) {
+        return addPage(components.toArray(new Component[]{}));
+    }
+
     public BookBuilder addPage(Component... components) {
         List<Component> list = new ArrayList<>(components.length);
         list.addAll(Arrays.asList(components));

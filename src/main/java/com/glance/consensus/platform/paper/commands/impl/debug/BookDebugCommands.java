@@ -1,7 +1,12 @@
 package com.glance.consensus.platform.paper.commands.impl.debug;
 
 import com.glance.consensus.platform.paper.commands.engine.CommandHandler;
+import com.glance.consensus.platform.paper.polls.display.book.PollBookViews;
+import com.glance.consensus.platform.paper.polls.display.book.builder.ClickMode;
+import com.glance.consensus.platform.paper.polls.domain.Poll;
+import com.glance.consensus.platform.paper.polls.runtime.PollManager;
 import com.google.auto.service.AutoService;
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import net.kyori.adventure.inventory.Book;
 import net.kyori.adventure.text.Component;
@@ -12,11 +17,18 @@ import org.bukkit.inventory.ItemStack;
 import org.incendo.cloud.annotations.Command;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.UUID;
-
 @Singleton
 @AutoService(CommandHandler.class)
 public class BookDebugCommands implements CommandHandler {
+
+    private final PollManager pollManager;
+
+    @Inject
+    public BookDebugCommands(
+        @NotNull final PollManager pollManager
+    ) {
+        this.pollManager = pollManager;
+    }
 
     @Command("c debug hover-book")
     public void hoverBook(
@@ -46,6 +58,23 @@ public class BookDebugCommands implements CommandHandler {
            page
         );
 
+        player.openBook(book);
+    }
+
+    @Command("c debug poll-vote")
+    public void pollVoteBook(
+        @NotNull Player player
+    ) {
+        var polls = pollManager.active();
+        if (polls == null) return;
+
+        var poll = polls.stream().findFirst();
+        if (poll.isEmpty()) {
+            player.sendMessage("No active poll");
+            return;
+        }
+
+        ItemStack book = PollBookViews.buildVotingBook(player, poll.get(), ClickMode.CALLBACKS);
         player.openBook(book);
     }
 

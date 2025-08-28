@@ -1,4 +1,4 @@
-package com.glance.consensus.platform.paper.polls.display.book.alignment;
+package com.glance.consensus.platform.paper.polls.display.book.utils;
 
 /**
  * Represents predefined spacing values (as strings of spaces) for use in text layout

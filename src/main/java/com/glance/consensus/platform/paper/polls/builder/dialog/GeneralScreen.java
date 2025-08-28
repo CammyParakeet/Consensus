@@ -92,6 +92,8 @@ public final class GeneralScreen implements PollBuildScreen {
                 DialogAction.customClick((v, a) -> {
                     if (!(a instanceof Player p)) return;
                     updateSession(session, v, p);
+
+                    this.pollManager.createFromBuildSession(player, session);
                 }, ClickCallback.Options.builder()
                         .uses(1)
                         .lifetime(ClickCallback.DEFAULT_LIFETIME).build())
@@ -213,7 +215,7 @@ public final class GeneralScreen implements PollBuildScreen {
                     .initial(session.getQuestionRaw() != null ? session.getQuestionRaw() : "My new poll")
                     .labelVisible(true)
                     .width(300)
-                    .maxLength(48)
+                    .maxLength(156)
                     .build(),
 
             DialogInput.singleOption(K_PRESET_DURATION,

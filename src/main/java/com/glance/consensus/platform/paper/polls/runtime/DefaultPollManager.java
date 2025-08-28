@@ -10,6 +10,7 @@ import com.glance.consensus.utils.StringUtils;
 import com.google.auto.service.AutoService;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import lombok.extern.slf4j.Slf4j;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
@@ -19,6 +20,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Singleton
 @AutoService(PollManager.class)
 public class DefaultPollManager implements PollManager {
@@ -74,6 +76,7 @@ public class DefaultPollManager implements PollManager {
         var poll = new Poll(id, creator.getUniqueId(), question, now, closeAt, normalized, rules);
         var runtime = new PollRuntime(poll);
 
+        log.warn("Created poll {}", poll);
         polls.put(id, runtime);
 
         return id;
@@ -86,6 +89,7 @@ public class DefaultPollManager implements PollManager {
 
     @Override
     public Collection<PollRuntime> active() {
+        log.warn("Active poll? {}", polls);
         return polls.values().stream().filter(p -> !p.getPoll().isClosed()).toList();
     }
 

@@ -32,4 +32,18 @@ public final class Poll {
     private final PollRules rules;
     private volatile boolean closed = false;
 
+    @Override
+    public String toString() {
+        return "Poll{" +
+                "id=" + id +
+                ", owner=" + owner +
+                ", question='" + questionRaw + '\'' +
+                ", createdAt=" + createdAt +
+                ", closesAt=" + closesAt +
+                ", options=" + (options != null ? options.size() : 0) +
+                ", rules=" + rules +
+                ", closed=" + closed +
+                '}';
+    }
+
 }

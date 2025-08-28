@@ -1,7 +1,7 @@
-package com.glance.consensus.platform.paper.polls.display.book.alignment;
+package com.glance.consensus.platform.paper.polls.display.book.utils;
 
 /**
- * Text alignment modes for rendering within book pages or other constrained UIs
+ * Text utils modes for rendering within book pages or other constrained UIs
  * <p>
  * Determines how text is padded relative to the maximum available line width
  *

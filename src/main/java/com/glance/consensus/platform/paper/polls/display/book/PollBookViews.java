@@ -5,6 +5,7 @@ import com.glance.consensus.platform.paper.polls.display.book.utils.TextAlign;
 import com.glance.consensus.platform.paper.polls.display.book.builder.BookBuilder;
 import com.glance.consensus.platform.paper.polls.display.book.builder.ClickMode;
 import com.glance.consensus.platform.paper.polls.display.book.utils.TruncationUtils;
+import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.runtime.PollRuntime;
 import com.glance.consensus.platform.paper.utils.ComponentUtils;
 import com.glance.consensus.platform.paper.utils.Mini;
@@ -37,9 +38,23 @@ public class PollBookViews {
             .setTitle(Mini.parseMini("Poll: " + poll.getQuestionRaw()))
             .setAuthor(Mini.parseMini(poll.getOwner().toString()));
 
-        List<Component> page = new ArrayList<>();
-
         /* Handling Poll Question */
+        List<Component> page = new ArrayList<>(formatPollQuestion(runtime));
+
+        // Gap
+        page.add(Component.empty());
+
+        /* Handling Poll Answers */
+        page.addAll(formatPollAnswers(runtime));
+
+        builder.addPage(page);
+        return builder.itemStack();
+    }
+
+    // TODO: add hover and click to poll info??
+    private List<Component> formatPollQuestion(@NotNull PollRuntime runtime) {
+        @NotNull Poll poll = runtime.getPoll();
+        List<Component> question = new ArrayList<>();
 
         var questionParsed = center(poll.getQuestionRaw());
         Component questionComp;
@@ -48,23 +63,29 @@ public class PollBookViews {
         } else {
             questionComp = questionParsed.value();
         }
-        page.add(questionComp);
-        page.add(Component.empty());
+        question.add(questionComp);
 
-        /* Handling Poll Answers */
+        return question;
+    }
 
+    // TODO: add click event to vote!!
+    private List<Component> formatPollAnswers(@NotNull PollRuntime runtime) {
+        @NotNull Poll poll = runtime.getPoll();
+        List<Component> answers = new ArrayList<>();
+
+        // Center if we have missing answers
         int answerCount = poll.getOptions().size();
         int missing = Math.max(0, TARGET_OPTIONS - answerCount);
         int extraPad = (missing * LINES_PER_OPTION_MISSING) / 2;
         for (int i = 0; i < extraPad; i++) {
-            page.add(Component.empty());
+            answers.add(Component.empty());
         }
 
         for (var opt : poll.getOptions()) {
-            page.add(SMALL_GAP);
+            answers.add(SMALL_GAP);
             Component tt = opt.tooltipRaw() != null
-                ? Mini.parseMini(opt.tooltipRaw())
-                : Component.empty();
+                    ? Mini.parseMini(opt.tooltipRaw())
+                    : Component.empty();
 
             var answerParsed = center(opt.labelRaw());
             Component hoverComp;
@@ -77,12 +98,11 @@ public class PollBookViews {
                 hoverComp = tt;
             }
 
-            page.add(answerParsed.value().hoverEvent(hoverComp));
+            answers.add(answerParsed.value().hoverEvent(hoverComp));
         }
-        page.add(SMALL_GAP);
-        
-        builder.addPage(page);
-        return builder.itemStack();
+        answers.add(SMALL_GAP);
+
+        return answers;
     }
 
     // todo

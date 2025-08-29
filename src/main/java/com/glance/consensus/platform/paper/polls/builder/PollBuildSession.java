@@ -1,7 +1,7 @@
 package com.glance.consensus.platform.paper.polls.builder;
 
 import com.glance.consensus.platform.paper.polls.builder.dialog.DurationPresets;
-import com.glance.consensus.platform.paper.polls.domain.PollAnswer;
+import com.glance.consensus.platform.paper.polls.domain.PollOption;
 import com.glance.consensus.utils.StringUtils;
 import lombok.Data;
 import org.jetbrains.annotations.NotNull;
@@ -22,13 +22,14 @@ public final class PollBuildSession {
     private final UUID playerId;
     private Stage stage = Stage.GENERAL;
 
+    private @Nullable String suppliedId;
     private String questionRaw = "";
 
     private @Nullable String durationPresetId = "1h";
     private int customHours = 0;
     private int customMins = 0;
 
-    private final List<PollAnswer> answers = new ArrayList<>();
+    private final List<PollOption> answers = new ArrayList<>();
 
     private boolean multipleChoice = false; // default to single-answer
     private int maxSelections = 1; // capped to 1 if multipleChoice = false, and to MAX_OPTIONS
@@ -54,18 +55,18 @@ public final class PollBuildSession {
     }
 
     /** Adds a new answer at the end, reindexing */
-    public PollAnswer addAnswer(
+    public PollOption addAnswer(
         @NotNull String labelRaw,
         @Nullable String tooltipRaw
     ) {
         if (!canAddAnswer()) throw new IllegalStateException("Max poll answers reached");
-        PollAnswer option = new PollAnswer(answers.size(), labelRaw, StringUtils.emptyToNull(tooltipRaw), 0);
+        PollOption option = new PollOption(answers.size(), labelRaw, StringUtils.emptyToNull(tooltipRaw), 0);
         answers.add(option);
         return option;
     }
 
     /** Inserts or replaces at index; index clamped to [0..size] */
-    public PollAnswer upsertAnswer(
+    public PollOption upsertAnswer(
         int index, String labelRaw, String tooltipRaw
     ) {
         int size = answers.size();
@@ -75,8 +76,8 @@ public final class PollBuildSession {
         if (index == size) {
             return addAnswer(labelRaw, tooltipRaw);
         } else {
-            PollAnswer existing = answers.get(index);
-            PollAnswer updated = new PollAnswer(
+            PollOption existing = answers.get(index);
+            PollOption updated = new PollOption(
                     existing.index(), labelRaw, StringUtils.emptyToNull(tooltipRaw), 0);
             answers.set(index, updated);
             reindex();
@@ -112,7 +113,7 @@ public final class PollBuildSession {
         to = Math.max(0, Math.min(size - 1, to));
         if (from == to) return false;
 
-        final PollAnswer moved = answers.remove(from);
+        final PollOption moved = answers.remove(from);
         answers.add(to, moved);
         reindex();
 
@@ -135,7 +136,7 @@ public final class PollBuildSession {
     private void reindex() {
         for (int i = 0; i < answers.size(); i++) {
             var o = answers.get(i);
-            if (o.index() != i) answers.set(i, new PollAnswer(i, o.labelRaw(), o.tooltipRaw(), o.votes()));
+            if (o.index() != i) answers.set(i, new PollOption(i, o.labelRaw(), o.tooltipRaw(), o.votes()));
         }
     }
 

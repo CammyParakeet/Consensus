@@ -5,6 +5,7 @@ import com.glance.consensus.platform.paper.polls.builder.PollBuildSession;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -28,7 +29,13 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface PollManager extends Manager {
 
-    void startBuildSession(@NotNull Player player);
+    /**
+     * Initialize a poll building session and start the wizard
+     *
+     * @param player the player who is creating the poll
+     * @param suppliedId optional custom user driven identifier for the poll separate to internal ID
+     */
+    void startBuildSession(@NotNull Player player, @Nullable String suppliedId);
 
     /**
      * Creates a new {@link Poll} from a completed build session

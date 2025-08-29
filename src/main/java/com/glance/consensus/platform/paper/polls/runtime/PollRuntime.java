@@ -1,7 +1,7 @@
 package com.glance.consensus.platform.paper.polls.runtime;
 
 import com.glance.consensus.platform.paper.polls.domain.Poll;
-import com.glance.consensus.platform.paper.polls.domain.PollAnswer;
+import com.glance.consensus.platform.paper.polls.domain.PollOption;
 import com.glance.consensus.platform.paper.polls.domain.PollRules;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Runtime wrapper around a {@link Poll}, handling live votes and tallies
  * <p>
  * Stores per-voter selections, enforces {@link PollRules}, and updates
- * {@link PollAnswer} vote counts in-place on each vote
+ * {@link PollOption} vote counts in-place on each vote
  * <p>
  * Thread-safe: vote and close operations are synchronized
  *
@@ -70,7 +70,7 @@ public final class PollRuntime {
         for (Set<Integer> s : votes.values()) for (int i : s) counts[i]++;
         for (int i = 0; i < optCount; i++) {
             var option = poll.getOptions().get(i);
-            poll.getOptions().set(i, new PollAnswer(
+            poll.getOptions().set(i, new PollOption(
                     option.index(), option.labelRaw(), option.tooltipRaw(), counts[i]));
         }
         return true;

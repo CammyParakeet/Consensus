@@ -1,8 +1,7 @@
 package com.glance.consensus.platform.paper.polls.persistence.file;
 
-import ca.spottedleaf.concurrentutil.completable.Completable;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
-import com.glance.consensus.platform.paper.polls.domain.PollAnswer;
+import com.glance.consensus.platform.paper.polls.domain.PollOption;
 import com.glance.consensus.platform.paper.polls.domain.PollRules;
 import com.glance.consensus.platform.paper.polls.persistence.PollStorage;
 import com.glance.consensus.platform.paper.polls.persistence.config.PollStorageConfig;
@@ -14,6 +13,7 @@ import com.google.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -22,6 +22,7 @@ import java.io.Writer;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -69,65 +70,68 @@ public class FlatFilePollStorage implements PollStorage {
     /* ---- DTOs ---- */
 
     // Stored poll JSON (no per-answer votes; those live in votes JSON)
-    private static final class PollRecord {
+    private static final class PollData {
         String id;
+        @Nullable String readableId;
         String owner;
         String questionRaw;
-        long createdAt;
-        long closesAt;
+        Long createdAt;
+        Long closesAt;
+        @Nullable Long closedAt;
         boolean closed;
         boolean multipleChoice;
-        int maxSelections;
+        Integer maxSelections;
         boolean allowResubmissions;
         List<AnswerRecord> answers = new ArrayList<>();
     }
 
-    private static final class AnswerRecord {
-        int idx;
-        String labelRaw;
-        String tooltipRaw; // nullable
-    }
+    private record AnswerRecord(
+        int idx,
+        @NotNull String labelRaw,
+        @Nullable String tooltipRaw
+    ) {}
 
     private static final Type VOTES_MAP_TYPE = new TypeToken<Map<String, Set<Integer>>>() {}.getType();
 
-    private PollRecord toRecord(Poll poll) {
-        PollRecord r = new PollRecord();
-        r.id = poll.getId().toString();
-        r.owner = poll.getOwner().toString();
-        r.questionRaw = poll.getQuestionRaw();
-        r.createdAt = poll.getCreatedAt().toEpochMilli();
-        r.closesAt = poll.getClosesAt().toEpochMilli();
-        r.closed = poll.isClosed();
-        r.multipleChoice = poll.getRules().multipleChoice();
-        r.maxSelections = poll.getRules().maxSelections();
-        r.allowResubmissions = poll.getRules().allowResubmissions();
+    private PollData toData(@NotNull Poll poll) {
+        PollData pd = new PollData();
+        pd.id = poll.getId().toString();
+        pd.readableId = poll.getPollIdentifier();
+        pd.owner = poll.getOwner().toString();
+        pd.questionRaw = poll.getQuestionRaw();
+        pd.createdAt = poll.getCreatedAt().toEpochMilli();
+        pd.closesAt = poll.getClosesAt().toEpochMilli();
+        pd.closedAt = poll.getClosedAt() != null ? poll.getClosedAt().toEpochMilli() : null;
+        pd.closed = poll.isClosed();
+        pd.multipleChoice = poll.getRules().multipleChoice();
+        pd.maxSelections = poll.getRules().maxSelections();
+        pd.allowResubmissions = poll.getRules().allowResubmissions();
 
         for (var a : poll.getOptions()) {
-            AnswerRecord ar = new AnswerRecord();
-            ar.idx = a.index();
-            ar.labelRaw = a.labelRaw();
-            ar.tooltipRaw = a.tooltipRaw();
-            r.answers.add(ar);
+            AnswerRecord ar = new AnswerRecord(a.index(), a.labelRaw(), a.tooltipRaw());
+            pd.answers.add(ar);
         }
-        return r;
+        return pd;
     }
 
-    private Poll fromRecord(PollRecord r) {
-        List<PollAnswer> opts = new ArrayList<>(r.answers.size());
-        for (var ar : r.answers) {
-            opts.add(new PollAnswer(ar.idx, ar.labelRaw, ar.tooltipRaw, 0)); // votes applied separately
+    private Poll fromData(PollData pd) {
+        List<PollOption> opts = new ArrayList<>(pd.answers.size());
+        for (var ar : pd.answers) {
+            opts.add(new PollOption(ar.idx, ar.labelRaw, ar.tooltipRaw, 0)); // votes applied separately
         }
-        var rules = new PollRules(r.multipleChoice, r.maxSelections, r.allowResubmissions);
+        var rules = new PollRules(pd.multipleChoice, pd.maxSelections, pd.allowResubmissions);
         Poll p = new Poll(
-            UUID.fromString(r.id),
-            UUID.fromString(r.owner),
-            r.questionRaw,
-            Instant.ofEpochMilli(r.createdAt),
-            Instant.ofEpochMilli(r.closesAt),
+            UUID.fromString(pd.id),
+            pd.readableId != null ? pd.readableId : pd.id,
+            UUID.fromString(pd.owner),
+            pd.questionRaw,
+            Instant.ofEpochMilli(pd.createdAt),
+            Instant.ofEpochMilli(pd.closesAt),
+            pd.closedAt != null ? Instant.ofEpochMilli(pd.closedAt) : null,
             opts,
             rules
         );
-        p.setClosed(r.closed);
+        p.setClosed(pd.closed);
         return p;
     }
 
@@ -153,18 +157,18 @@ public class FlatFilePollStorage implements PollStorage {
         }
     }
 
-    private Optional<PollRecord> loadPollRecord(UUID pollId) {
+    private Optional<PollData> loadPollData(UUID pollId) {
         File f = pollFile(pollId);
         if (!f.exists()) return Optional.empty();
         try (Reader r = Files.newBufferedReader(f.toPath(), StandardCharsets.UTF_8)) {
-            PollRecord pr = gson.fromJson(r, PollRecord.class);
+            PollData pr = gson.fromJson(r, PollData.class);
             return Optional.ofNullable(pr);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private void savePollRecord(PollRecord pr) {
+    private void savePollData(PollData pr) {
         File f = pollFile(UUID.fromString(pr.id));
         try (Writer w = Files.newBufferedWriter(f.toPath(), StandardCharsets.UTF_8)) {
             gson.toJson(pr, w);
@@ -186,7 +190,7 @@ public class FlatFilePollStorage implements PollStorage {
         return CompletableFuture.runAsync(() -> {
             synchronized (ioLock) {
                 // write poll file
-                savePollRecord(toRecord(poll));
+                savePollData(toData(poll));
                 // ensure empty votes file exists
                 File vf = votesFile(poll.getId());
                 if (!vf.exists()) saveVotesRaw(poll.getId(), new HashMap<>());
@@ -198,14 +202,13 @@ public class FlatFilePollStorage implements PollStorage {
     public CompletableFuture<Optional<Poll>> loadPoll(@NotNull UUID pollId) {
         return CompletableFuture.supplyAsync(() -> {
             synchronized (ioLock) {
-                return loadPollRecord(pollId).map(this::fromRecord);
+                return loadPollData(pollId).map(this::fromData);
             }
         });
     }
 
     @Override
     public CompletableFuture<List<Poll>> loadActivePolls() {
-        log.warn("Loading active polls??");
         return CompletableFuture.supplyAsync(() -> {
             long now = System.currentTimeMillis();
             List<Poll> out = new ArrayList<>();
@@ -214,9 +217,9 @@ public class FlatFilePollStorage implements PollStorage {
                 if (files == null) return out;
                 for (File f : files) {
                     try (Reader r = Files.newBufferedReader(f.toPath(), StandardCharsets.UTF_8)) {
-                        PollRecord pr = gson.fromJson(r, PollRecord.class);
-                        if (pr == null) continue;
-                        if (!pr.closed && pr.closesAt > now) out.add(fromRecord(pr));
+                        PollData pd = gson.fromJson(r, PollData.class);
+                        if (pd == null) continue;
+                        if (!pd.closed && pd.closesAt > now) out.add(fromData(pd));
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
@@ -227,15 +230,46 @@ public class FlatFilePollStorage implements PollStorage {
     }
 
     @Override
+    public CompletableFuture<List<Poll>> loadRecentPolls(@NotNull Duration retention) {
+        final long now = System.currentTimeMillis();
+        final long cutoff = retention.isNegative() ? Long.MIN_VALUE : now - retention.toMillis();
+
+        return CompletableFuture.supplyAsync(() -> {
+           List<Poll> out = new ArrayList<>();
+           synchronized (ioLock) {
+               File[] files = baseDir.listFiles((dir, name) -> name.endsWith(".json") && !name.contains("-votes"));
+               if (files == null) return out;
+
+               for (File f : files) {
+                   try (Reader r = Files.newBufferedReader(f.toPath(), StandardCharsets.UTF_8)) {
+                       PollData pd = gson.fromJson(r, PollData.class);
+                       if (pd == null) continue;
+
+                       boolean active = !pd.closed && pd.closesAt > now;
+                       boolean recentClosed = pd.closed && (pd.closedAt != null) && pd.closedAt >= cutoff;
+
+                       if (active || recentClosed) {
+                           out.add(fromData(pd));
+                       }
+                   } catch (IOException e) {
+                       throw new RuntimeException(e);
+                   }
+               }
+           }
+           return out;
+        });
+    }
+
+    @Override
     public CompletableFuture<Void> closePoll(@NotNull UUID pollId, @NotNull Instant closedAt) {
         return CompletableFuture.runAsync(() -> {
             synchronized (ioLock) {
-                var opt = loadPollRecord(pollId);
+                var opt = loadPollData(pollId);
                 if (opt.isEmpty()) return;
-                var pr = opt.get();
-                pr.closed = true;
-                pr.closesAt = closedAt.toEpochMilli(); // keep closure moment
-                savePollRecord(pr);
+                var pd = opt.get();
+                pd.closed = true;
+                pd.closesAt = closedAt.toEpochMilli(); // keep closure moment
+                savePollData(pd);
             }
         });
     }

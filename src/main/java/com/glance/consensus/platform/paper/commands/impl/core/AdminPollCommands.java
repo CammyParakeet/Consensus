@@ -21,6 +21,7 @@ import org.incendo.cloud.annotations.Permission;
 import org.incendo.cloud.annotations.suggestion.Suggestions;
 import org.incendo.cloud.context.CommandContext;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -84,12 +85,13 @@ public class AdminPollCommands implements CommandHandler {
             .toList();
     }
 
-    @Command("poll create")
+    @Command("poll create [id]")
     @Permission("consensus.polls.create")
     public void createPoll(
-        @NotNull Player player
+        @NotNull Player player,
+        @Nullable @Argument String id
     ) {
-        this.manager.startBuildSession(player);
+        this.manager.startBuildSession(player, id);
     }
 
     // todo use list option for suggestions

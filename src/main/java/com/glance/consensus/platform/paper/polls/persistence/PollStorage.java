@@ -3,6 +3,7 @@ package com.glance.consensus.platform.paper.polls.persistence;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
 import org.jetbrains.annotations.NotNull;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -49,12 +50,25 @@ public interface PollStorage {
     CompletableFuture<Optional<Poll>> loadPoll(@NotNull UUID pollId);
 
     /**
-     * Loads all currently active (open) polls, based on backend's notion of
-     * {@code closed == false} and {@code closesAt > now}
+     * Loads all currently active (open) polls
      *
-     * @return future with the list of active polls (answers have {@code votes=0}; tallies are separate)
+     * @return future with list of active polls
      */
     CompletableFuture<List<Poll>> loadActivePolls();
+
+    /**
+     * Loads polls that should be visible in runtime
+     * <li>all active</li>
+     * <li>closed polls within the retention window</li>
+     *
+     * @param retention how long to keep closed polls visible
+     * @return future with active + recently-closed polls
+     */
+    CompletableFuture<List<Poll>> loadRecentPolls(@NotNull Duration retention);
+
+    default CompletableFuture<List<Poll>> loadAllPolls() {
+        return loadRecentPolls(Duration.ofDays(-1));
+    }
 
     /**
      * Marks a poll as closed and records the closure time

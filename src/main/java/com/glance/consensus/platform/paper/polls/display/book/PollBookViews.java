@@ -11,12 +11,15 @@ import com.glance.consensus.platform.paper.utils.ComponentUtils;
 import com.glance.consensus.platform.paper.utils.Mini;
 import lombok.experimental.UtilityClass;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 @UtilityClass
 public class PollBookViews {
@@ -45,7 +48,7 @@ public class PollBookViews {
         page.add(Component.empty());
 
         /* Handling Poll Answers */
-        page.addAll(formatPollAnswers(runtime));
+        page.addAll(formatPollAnswers(viewer, runtime));
 
         builder.addPage(page);
         return builder.itemStack();
@@ -69,7 +72,10 @@ public class PollBookViews {
     }
 
     // TODO: add click event to vote!!
-    private List<Component> formatPollAnswers(@NotNull PollRuntime runtime) {
+    private List<Component> formatPollAnswers(
+        @NotNull Player viewer,
+        @NotNull PollRuntime runtime
+    ) {
         @NotNull Poll poll = runtime.getPoll();
         List<Component> answers = new ArrayList<>();
 
@@ -81,13 +87,22 @@ public class PollBookViews {
             answers.add(Component.empty());
         }
 
+        final Set<Integer> viewerVotes = runtime.selectionSnapshot(viewer.getUniqueId());
+
         for (var opt : poll.getOptions()) {
             answers.add(SMALL_GAP);
+
+            final int idx = opt.index();
+            final boolean selected = viewerVotes.contains(idx);
+
+            final String prefix = selected ? "[✓] " : "[ ] ";
+            final String displayRaw = prefix + opt.labelRaw();
+
             Component tt = opt.tooltipRaw() != null
                     ? Mini.parseMini(opt.tooltipRaw())
                     : Component.empty();
 
-            var answerParsed = center(opt.labelRaw());
+            var answerParsed = center(displayRaw);
             Component hoverComp;
             if (answerParsed.truncated()) {
                 if (!ComponentUtils.isVisuallyEmpty(tt)) tt = Component
@@ -98,11 +113,43 @@ public class PollBookViews {
                 hoverComp = tt;
             }
 
-            answers.add(answerParsed.value().hoverEvent(hoverComp));
+            final Component actionHint = buildActionHint(poll, selected);
+            final Component fullHoverComp = Component.text()
+                    .append(hoverComp, Component.text("\n\n"), actionHint).build();
+
+            Component line = answerParsed.value().hoverEvent(fullHoverComp);
+            line = line.clickEvent(ClickEvent.callback(a -> {
+                if (!(a instanceof Player p)) return;
+
+                p.sendMessage("You voted for " + poll.getPollIdentifier());
+                p.performCommand("poll vote " + poll.getPollIdentifier() + " " + idx);
+            }));
+
+            answers.add(line);
         }
         answers.add(SMALL_GAP);
 
         return answers;
+    }
+
+    private Component buildActionHint(@NotNull Poll poll, boolean selected) {
+        var rules = poll.getRules();
+        final String msg;
+        if (selected) {
+            if (!rules.allowResubmissions()) {
+                msg = "<gray>You've voted for this option";
+            } else if (rules.multipleChoice()) {
+                msg = "<gray>You've voted for this option. Click to unselect";
+            } else {
+                msg = "<gray>You've voted for this option. Click to change your vote";
+            }
+        } else {
+            msg = rules.multipleChoice()
+                    ? "<green>Click to select"
+                    : "<green>Click to vote";
+        }
+
+        return Mini.parseMini(msg);
     }
 
     // todo

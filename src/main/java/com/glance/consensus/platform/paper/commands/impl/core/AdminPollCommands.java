@@ -3,6 +3,8 @@ package com.glance.consensus.platform.paper.commands.impl.core;
 import com.glance.consensus.platform.paper.commands.engine.CommandHandler;
 import com.glance.consensus.platform.paper.polls.display.book.PollBookViews;
 import com.glance.consensus.platform.paper.polls.display.book.builder.ClickMode;
+import com.glance.consensus.platform.paper.polls.domain.Poll;
+import com.glance.consensus.platform.paper.polls.domain.PollRules;
 import com.glance.consensus.platform.paper.polls.persistence.PollStorage;
 import com.glance.consensus.platform.paper.polls.runtime.PollManager;
 import com.glance.consensus.platform.paper.polls.runtime.PollRuntime;
@@ -71,7 +73,7 @@ public class AdminPollCommands implements CommandHandler {
         };
 
         var ids = source.stream()
-            .map(rt -> rt.getPoll().getId().toString())
+            .map(rt -> rt.getPoll().getPollIdentifier())
             .sorted()
             .collect(Collectors.toCollection(ArrayList::new));
 
@@ -115,6 +117,52 @@ public class AdminPollCommands implements CommandHandler {
 
         ItemStack book = PollBookViews.buildVotingBook(player, rtOpt.get(), ClickMode.CALLBACKS);
         player.openBook(book);
+    }
+
+    @Command("poll vote <id> <answer>")
+    @Permission("consensus.polls.vote")
+    public void addPollVote(
+        @NotNull Player player,
+        @NotNull @Argument(value = "id", suggestions = "pollIds") String id,
+        @NotNull @Argument(value = "answer") Integer index
+    ) {
+        var targetId = resolvePollId(id);
+        if (targetId.isEmpty()) {
+            // todo
+            return;
+        }
+
+        var rtOpt = manager.get(targetId.get());
+        if (rtOpt.isEmpty()) {
+            // todo
+            return;
+        }
+
+        PollRuntime rt = rtOpt.get();
+        Poll poll = rt.getPoll();
+        if (poll.isClosed()) {
+            // todo
+            return;
+        }
+
+        var options = poll.getOptions();
+        if (index < 0 || index >= options.size()) {
+            // todo
+            return;
+        }
+
+        UUID voter = player.getUniqueId();
+        Set<Integer> current = rt.selectionSnapshot(voter);
+        Set<Integer> next = new HashSet<>(current);
+        PollRules rules = poll.getRules();
+
+        // todo handle rules
+
+        boolean accepted = rt.vote(voter, next);
+        if (!accepted) {
+            // todo
+            return;
+        }
     }
 
     @Command("poll delete <id>")

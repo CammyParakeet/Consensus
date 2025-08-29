@@ -30,6 +30,30 @@ public final class PollRuntime {
     // voterId -> indices chosen
     private final Map<UUID, Set<Integer>> votes = new ConcurrentHashMap<>();
 
+    public synchronized boolean hasVoted(@NotNull UUID voter) {
+        var s = votes.get(voter);
+        return s != null && !s.isEmpty();
+    }
+
+    public synchronized Set<UUID> votersSnapshot() {
+        return Set.copyOf(votes.keySet());
+    }
+
+    public synchronized Set<Integer> selectionSnapshot(@NotNull UUID voter) {
+        var s = votes.get(voter);
+        return (s == null) ? Set.of() : Set.copyOf(s);
+    }
+
+    public synchronized void supplyVotes(
+        @NotNull UUID voter,
+        @NotNull Collection<Integer> indices
+    ) {
+        if (indices.isEmpty()) return;
+        votes.put(voter, new HashSet<>(indices));
+
+        recomputeTallies();
+    }
+
     /**
      * Records a vote for the given voter
      *
@@ -66,14 +90,20 @@ public final class PollRuntime {
             votes.put(voter, set);
         }
 
+        recomputeTallies();
+        return true;
+    }
+
+    private void recomputeTallies() {
+        final int optCount = poll.getOptions().size();
         int[] counts = new int[optCount];
         for (Set<Integer> s : votes.values()) for (int i : s) counts[i]++;
+
         for (int i = 0; i < optCount; i++) {
             var option = poll.getOptions().get(i);
             poll.getOptions().set(i, new PollOption(
                     option.index(), option.labelRaw(), option.tooltipRaw(), counts[i]));
         }
-        return true;
     }
 
     /**

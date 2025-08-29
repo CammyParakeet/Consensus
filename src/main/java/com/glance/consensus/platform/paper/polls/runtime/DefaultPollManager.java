@@ -104,7 +104,7 @@ public final class DefaultPollManager implements PollManager {
 
         var poll = new Poll(
             id,
-            session.getSuppliedId(),
+            session.getSuppliedId() != null ? session.getSuppliedId() : id.toString(),
             creator.getUniqueId(),
             question,
             now,
@@ -117,10 +117,7 @@ public final class DefaultPollManager implements PollManager {
 
         return storageProvider.get().createPoll(poll).thenApply(p -> {
             var runtime = new PollRuntime(poll);
-
-            log.warn("Created poll {}", poll);
             polls.put(id, runtime);
-
             return id;
         });
     }
@@ -138,6 +135,11 @@ public final class DefaultPollManager implements PollManager {
     @Override
     public Collection<PollRuntime> active() {
         return polls.values().stream().filter(p -> !p.getPoll().isClosed()).toList();
+    }
+
+    @Override
+    public void markVoted(@NotNull UUID pollId, @NotNull UUID voterId) {
+
     }
 
     @Override
@@ -167,28 +169,60 @@ public final class DefaultPollManager implements PollManager {
 
     @Override
     public void onEnable() {
+        loadPolls();
+    }
+
+    private void loadPolls() {
         PollStorage storage = storageProvider.get();
         if (storage == null) throw new IllegalStateException("A Storage system was not initialized");
 
         storage.loadRecentPolls(CLOSED_RETENTION).thenAccept(list -> {
+            List<CompletableFuture<Void>> voteLoadFutures = new ArrayList<>(list.size());
+
             for (Poll p : list) {
                 PollRuntime r = new PollRuntime(p);
-                // todo get tallies from storage
-//                storage.loadTallies(p.getId()).thenAccept(t -> {
-//                    // apply counts to runtime’s answers
-//                    var opts = p.getOptions();
-//                    for (int i = 0; i < opts.size(); i++) {
-//                        var a = opts.get(i);
-//                        opts.set(i, a.withVotes(t.getOrDefault(i, 0)));
-//                    }
-//                });
-                polls.put(p.getId(), r);
+
+                var future = storage.loadAllSelections(p.getId())
+                    .thenAccept(selections -> {
+                        PollRuntime rt = polls.computeIfAbsent(p.getId(), __ -> new PollRuntime(p));
+                        selections.forEach(rt::supplyVotes);
+                    })
+                    .exceptionally(ex -> {
+                        plugin.getLogger().warning("Failed to reload/supply vote selections for poll " +
+                                p.getPollIdentifier());
+                        return null;
+                    });
+
+                voteLoadFutures.add(future);
             }
 
-            sweepTask = plugin
-                    .getServer()
-                    .getScheduler()
-                    .runTaskTimerAsynchronously(plugin, this::sweepOnce, 20L * 2, SWEEP_PERIOD_TICKS);
+            CompletableFuture.allOf(voteLoadFutures.toArray(CompletableFuture[]::new))
+                .whenComplete((d, ex) -> {
+                    if (ex != null) {
+                        plugin.getLogger().warning("One of more polls failed to load their votes: "
+                                + ex.getMessage());
+                    }
+
+                    if (sweepTask != null) {
+                        sweepTask.cancel();
+                    }
+
+                    sweepTask = plugin
+                            .getServer()
+                            .getScheduler()
+                            .runTaskTimerAsynchronously(plugin, this::sweepOnce, 20L * 2, SWEEP_PERIOD_TICKS);
+                })
+                .exceptionally(ex -> {
+                    plugin.getLogger().severe("Failed to load recent polls: " + ex.getMessage());
+                    if (sweepTask != null) sweepTask.cancel();
+                    // still start a sweeper for anything still in memory
+                    sweepTask = plugin
+                            .getServer()
+                            .getScheduler()
+                            .runTaskTimerAsynchronously(plugin, this::sweepOnce, 20L * 2, SWEEP_PERIOD_TICKS);
+
+                    return null;
+                });
         });
     }
 

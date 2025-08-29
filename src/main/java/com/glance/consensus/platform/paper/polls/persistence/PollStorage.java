@@ -1,13 +1,12 @@
 package com.glance.consensus.platform.paper.polls.persistence;
 
 import com.glance.consensus.platform.paper.polls.domain.Poll;
+import com.glance.consensus.platform.paper.polls.runtime.PollRuntime;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -31,6 +30,8 @@ import java.util.concurrent.CompletableFuture;
  * @author Cammy
  */
 public interface PollStorage {
+
+    /* Poll Specific */
 
     /**
      * Creates or upserts a poll definition and its answers
@@ -79,8 +80,6 @@ public interface PollStorage {
      */
     CompletableFuture<Void> closePoll(@NotNull UUID pollId, @NotNull Instant closedAt);
 
-    // TODO: direct answer and voting queries
-
     /**
      * Deletes a poll and its associated selections
      *
@@ -88,5 +87,98 @@ public interface PollStorage {
      * @return future that completes after deletion
      */
     CompletableFuture<Void> deletePoll(@NotNull UUID pollId);
+
+    /* Voter Specific */
+
+    /**
+     * Computes the total number of votes for each option in a poll
+     *
+     * <p>A <em>tally</em> is the aggregated vote count for an option, derived by scanning
+     * every persisted voter selection for the poll. For example, if three voters each
+     * selected option index {@code 2}, then the tally map will contain {@code 2 -> 3}.
+     * </p>
+     *
+     * <p>This method must always reflect the state in storage
+     * <p>
+     * Implementations must not depend on in-memory counts maintained by {@link PollRuntime},
+     * because those only exist while the server is running. Recomputing from persisted
+     * selections ensures that results are correct after restarts or if memory and storage
+     * ever drift</p>
+     *
+     * @param pollId the poll to count votes for
+     * @return future completing with a map of {@code optionIndex -> voteCount}
+     *         Missing keys imply zero votes for that option
+     */
+    CompletableFuture<Map<Integer, Integer>> loadTallies(@NotNull UUID pollId);
+
+    /**
+     * Persists (creates or replaces) the full selection set for a single voter
+     *
+     * <p>Selections are stored atomically per (poll, voter). Any existing selection
+     * is overwritten. Implementations must ensure that the write is durable before
+     * completing the returned future</p>
+     *
+     * @param pollId poll id
+     * @param voterId voter making the selection
+     * @param indices indices of chosen options (maybe empty to clear vote)
+     * @return future completing when the selection has been stored
+     */
+    CompletableFuture<Void> saveVoterSelection(
+        @NotNull UUID pollId,
+        @NotNull UUID voterId,
+        @NotNull Set<Integer> indices
+    );
+
+    /**
+     * Removes a voter's selection from a poll
+     *
+     * <p>This is equivalent to {@link #saveVoterSelection(UUID, UUID, Set)} with
+     * an empty set, but is provided as a convenience for administrative rollback
+     * or cleanup scenarios</p>
+     *
+     * @param pollId poll id
+     * @param voterId voter whose selection should be removed
+     * @return future completing when the removal has been durably written
+     */
+    CompletableFuture<Void> deleteVoterSelection(
+        @NotNull UUID pollId,
+        @NotNull UUID voterId
+    );
+
+    /**
+     * Loads the stored selection set for a single voter in a poll
+     *
+     * <p>Selections are returned as the set of option indices chosen by the voter.
+     * If the voter has not yet voted, the result will be an empty set</p>
+     *
+     * @param pollId poll id
+     * @param voterId voter whose selection should be loaded
+     * @return future completing with the set of chosen option indices (possibly empty)
+     */
+    CompletableFuture<Set<Integer>> loadVoterSelection(
+        @NotNull UUID pollId,
+        @NotNull UUID voterId
+    );
+
+    /**
+     * Loads all voters who currently have a stored selection for the given poll
+     *
+     * <p>The returned set contains only voter UUIDs; to inspect individual choices,
+     * see {@link #loadAllSelections(UUID)}</p>
+     *
+     * @param pollId poll id
+     * @return future completing with the set of voter UUIDs
+     */
+    CompletableFuture<Set<UUID>> loadVoters(@NotNull UUID pollId);
+
+    /**
+     * Loads the complete set of stored selections for a poll
+     *
+     * <p>Returns a mapping of voter UUID -> set of option indices chosen
+     *
+     * @param pollId poll id
+     * @return future completing with a map of voter ids to their chosen option indices
+     */
+    CompletableFuture<Map<UUID, Set<Integer>>> loadAllSelections(@NotNull UUID pollId);
 
 }

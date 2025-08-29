@@ -137,25 +137,7 @@ public class FlatFilePollStorage implements PollStorage {
 
     /* ---- Core Store ---- */
 
-    private Map<String, Set<Integer>> loadVotesRaw(UUID pollId) {
-        File f = votesFile(pollId);
-        if (!f.exists()) return new HashMap<>();
-        try (Reader r = Files.newBufferedReader(f.toPath(), StandardCharsets.UTF_8)) {
-            Map<String, Set<Integer>> m = gson.fromJson(r, VOTES_MAP_TYPE);
-            return (m != null) ? m : new HashMap<>();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private void saveVotesRaw(UUID pollId, Map<String, Set<Integer>> votes) {
-        File f = votesFile(pollId);
-        try (Writer w = Files.newBufferedWriter(f.toPath(), StandardCharsets.UTF_8)) {
-            gson.toJson(votes, VOTES_MAP_TYPE, w);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    /* Poll Specific */
 
     private Optional<PollData> loadPollData(UUID pollId) {
         File f = pollFile(pollId);
@@ -175,14 +157,6 @@ public class FlatFilePollStorage implements PollStorage {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    private Map<Integer, Integer> computeTallies(Map<String, Set<Integer>> votesRaw) {
-        Map<Integer, Integer> t = new HashMap<>();
-        for (Set<Integer> sel : votesRaw.values()) {
-            for (int idx : sel) t.merge(idx, 1, Integer::sum);
-        }
-        return t;
     }
 
     @Override
@@ -284,6 +258,125 @@ public class FlatFilePollStorage implements PollStorage {
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
+            }
+        });
+    }
+
+    /* Voter Specific */
+
+    private Map<String, Set<Integer>> loadVotesRaw(UUID pollId) {
+        File f = votesFile(pollId);
+        if (!f.exists()) return new HashMap<>();
+        try (Reader r = Files.newBufferedReader(f.toPath(), StandardCharsets.UTF_8)) {
+            Map<String, Set<Integer>> m = gson.fromJson(r, VOTES_MAP_TYPE);
+            return (m != null) ? m : new HashMap<>();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void saveVotesRaw(UUID pollId, Map<String, Set<Integer>> votes) {
+        File f = votesFile(pollId);
+        try (Writer w = Files.newBufferedWriter(f.toPath(), StandardCharsets.UTF_8)) {
+            gson.toJson(votes, VOTES_MAP_TYPE, w);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private Map<Integer, Integer> computeTallies(Map<String, Set<Integer>> votesRaw) {
+        Map<Integer, Integer> t = new HashMap<>();
+        for (Set<Integer> sel : votesRaw.values()) {
+            for (int idx : sel) t.merge(idx, 1, Integer::sum);
+        }
+        return t;
+    }
+
+    @Override
+    public CompletableFuture<Map<Integer, Integer>> loadTallies(@NotNull UUID pollId) {
+        return CompletableFuture.supplyAsync(() -> {
+            synchronized (ioLock) {
+                Map<String, Set<Integer>> votes = loadVotesRaw(pollId);
+                return computeTallies(votes);
+            }
+        });
+    }
+
+    @Override
+    public CompletableFuture<Void> saveVoterSelection(
+        @NotNull UUID pollId,
+        @NotNull UUID voterId,
+        @NotNull Set<Integer> indices
+    ) {
+        final Set<Integer> clean = Set.copyOf(indices);
+
+        return CompletableFuture.runAsync(() -> {
+           synchronized (ioLock) {
+               Map<String, Set<Integer>> votes = loadVotesRaw(pollId);
+               if (clean.isEmpty()) {
+                   // treat empty set as delete
+                   votes.remove(voterId.toString());
+               } else {
+                   votes.put(voterId.toString(), new HashSet<>());
+               }
+               saveVotesRaw(pollId, votes);
+           }
+        });
+    }
+
+    @Override
+    public CompletableFuture<Void> deleteVoterSelection(@NotNull UUID pollId, @NotNull UUID voterId) {
+        return CompletableFuture.runAsync(() -> {
+            synchronized (ioLock) {
+                Map<String, Set<Integer>> votes = loadVotesRaw(pollId);
+                votes.remove(voterId.toString());
+                saveVotesRaw(pollId, votes);
+            }
+        });
+    }
+
+    @Override
+    public CompletableFuture<Set<Integer>> loadVoterSelection(@NotNull UUID pollId, @NotNull UUID voterId) {
+        return CompletableFuture.supplyAsync(() -> {
+            synchronized (ioLock) {
+                Map<String, Set<Integer>> votes = loadVotesRaw(pollId);
+                Set<Integer> s = votes.get(voterId.toString());
+                return (s == null || s.isEmpty()) ? Set.of() : Set.copyOf(s);
+            }
+        });
+    }
+
+    @Override
+    public CompletableFuture<Set<UUID>> loadVoters(@NotNull UUID pollId) {
+        return CompletableFuture.supplyAsync(() -> {
+            synchronized (ioLock) {
+                Map<String, Set<Integer>> votes = loadVotesRaw(pollId);
+                Set<UUID> out = new HashSet<>(votes.size());
+                for (var e : votes.entrySet()) {
+                    if (e.getValue() == null || e.getValue().isEmpty()) continue;
+                    try {
+                        out.add(UUID.fromString(e.getKey()));
+                    } catch (IllegalArgumentException ignored) {}
+                }
+                return Collections.unmodifiableSet(out);
+            }
+        });
+    }
+
+    @Override
+    public CompletableFuture<Map<UUID, Set<Integer>>> loadAllSelections(@NotNull UUID pollId) {
+        return CompletableFuture.supplyAsync(() -> {
+            synchronized (ioLock) {
+                Map<String, Set<Integer>> raw = loadVotesRaw(pollId);
+                Map<UUID, Set<Integer>> out = new HashMap<>(raw.size());
+                for (var e : raw.entrySet()) {
+                    if (e.getValue() == null || e.getValue().isEmpty()) continue;
+                    try {
+                        UUID uid = UUID.fromString(e.getKey());
+                        out.put(uid, Set.copyOf(e.getValue()));
+                    } catch (IllegalArgumentException ignored) {}
+                }
+                return Collections.unmodifiableMap(out);
             }
         });
     }

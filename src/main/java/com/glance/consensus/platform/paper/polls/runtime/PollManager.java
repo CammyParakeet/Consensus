@@ -68,6 +68,9 @@ public interface PollManager extends Manager {
      */
     Collection<PollRuntime> active();
 
+    /** Record that a player voted in this poll (runtime-only cache) */
+    void markVoted(@NotNull UUID pollId, @NotNull UUID voterId);
+
     /** Convenience view of closed polls (derived from {@link #all()}) */
     default Collection<PollRuntime> closed() {
         return all().stream().filter(rt -> rt.getPoll().isClosed()).toList();

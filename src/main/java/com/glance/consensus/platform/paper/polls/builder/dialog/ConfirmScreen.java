@@ -3,6 +3,7 @@ package com.glance.consensus.platform.paper.polls.builder.dialog;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildScreen;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildSession;
+import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.runtime.PollManager;
 import com.google.auto.service.AutoService;
 import com.google.inject.Inject;
@@ -58,6 +59,11 @@ public final class ConfirmScreen implements PollBuildScreen {
         @NotNull Player player,
         @NotNull PollBuildSession session
     ) {
+        // TODO poll build validation?
+
+        @NotNull Poll poll = pollManager.buildFromSession(player, session);
+        // todo build preview
+
         var dialog = Dialog.create(b -> b.empty()
             // todo config for some of these specifics?
             .base(DialogBase.builder(Component.text("Poll Builder (Submit)"))
@@ -76,26 +82,19 @@ public final class ConfirmScreen implements PollBuildScreen {
                     Component.text("Click to submit your current Poll Builder"),
                     180,
                     DialogAction.customClick((view, audience) -> {
-                               // TODO
-                            },
-                            ClickCallback.Options.builder()
-                                    .uses(1)
-                                    .lifetime(ClickCallback.DEFAULT_LIFETIME)
-                                    .build()
+                        this.pollManager.registerPoll(player, poll);
+                    },
+                    ClickCallback.Options.builder()
+                            .uses(1)
+                            .lifetime(ClickCallback.DEFAULT_LIFETIME)
+                            .build()
                     )
                 ),
                 ActionButton.create(
                     Component.text("Exit"),
                     Component.text("This will exit the builder wizard"),
                     180,
-                    DialogAction.customClick((view, audience) -> {
-                                // TODO
-                            },
-                            ClickCallback.Options.builder()
-                                    .uses(1)
-                                    .lifetime(ClickCallback.DEFAULT_LIFETIME)
-                                    .build()
-                    )
+                    null
                 )
             ))
         );

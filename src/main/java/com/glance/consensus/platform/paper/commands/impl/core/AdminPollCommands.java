@@ -1,7 +1,7 @@
 package com.glance.consensus.platform.paper.commands.impl.core;
 
 import com.glance.consensus.platform.paper.commands.engine.CommandHandler;
-import com.glance.consensus.platform.paper.polls.display.book.PollBookViews;
+import com.glance.consensus.platform.paper.polls.display.PollDisplayNavigator;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.persistence.PollStorage;
 import com.glance.consensus.platform.paper.polls.runtime.PollManager;
@@ -14,7 +14,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.JoinConfiguration;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 import org.incendo.cloud.annotations.Argument;
 import org.incendo.cloud.annotations.Command;
 import org.incendo.cloud.annotations.Permission;
@@ -40,14 +39,17 @@ public class AdminPollCommands implements CommandHandler {
 
     private final PollManager manager;
     private final PollStorage storage;
+    private final PollDisplayNavigator displayNavigator;
 
     @Inject
     public AdminPollCommands(
         @NotNull PollManager manager,
-        @NotNull PollStorage storage
+        @NotNull PollStorage storage,
+        @NotNull PollDisplayNavigator displayNavigator
     ) {
         this.manager = manager;
         this.storage = storage;
+        this.displayNavigator = displayNavigator;
     }
 
     @Suggestions("pollIds")
@@ -114,8 +116,8 @@ public class AdminPollCommands implements CommandHandler {
         }
 
         // TODO use the display manager
-        ItemStack book = PollBookViews.buildVotingBook(player, rtOpt.get(), null);
-        player.openBook(book);
+        //ItemStack book = PollBookViews.buildVotingBook(player, rtOpt.get(), null);
+       this.displayNavigator.openVoting(player, rtOpt.get());
     }
 
     @Command("poll close <id>")

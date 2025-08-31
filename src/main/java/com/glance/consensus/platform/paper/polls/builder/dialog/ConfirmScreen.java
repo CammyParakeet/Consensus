@@ -4,6 +4,7 @@ import com.glance.consensus.platform.paper.polls.builder.PollBuildNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildScreen;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildSession;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
+import com.glance.consensus.platform.paper.polls.domain.PollOption;
 import com.glance.consensus.platform.paper.polls.runtime.PollManager;
 import com.google.auto.service.AutoService;
 import com.google.inject.Inject;
@@ -14,6 +15,8 @@ import io.papermc.paper.registry.data.dialog.DialogBase;
 import io.papermc.paper.registry.data.dialog.action.DialogAction;
 import io.papermc.paper.registry.data.dialog.body.DialogBody;
 import io.papermc.paper.registry.data.dialog.type.DialogType;
+import lombok.Getter;
+import lombok.Setter;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickCallback;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -22,7 +25,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Singleton
 @AutoService(PollBuildScreen.class)
@@ -59,12 +64,18 @@ public final class ConfirmScreen implements PollBuildScreen {
         @NotNull Player player,
         @NotNull PollBuildSession session
     ) {
-        // TODO poll build validation?
+        final Poll poll;
 
-        @NotNull Poll poll = pollManager.buildFromSession(player, session);
+        try {
+            poll = pollManager.buildFromSession(player, session);
+        } catch (Exception e) {
+            showInvalidDialog(player, session);
+            return;
+        }
+
         // todo build preview
 
-        var dialog = Dialog.create(b -> b.empty()
+        Dialog dialog = Dialog.create(b -> b.empty()
             // todo config for some of these specifics?
             .base(DialogBase.builder(Component.text("Poll Builder (Submit)"))
                 .body(List.of(
@@ -100,6 +111,93 @@ public final class ConfirmScreen implements PollBuildScreen {
         );
 
         player.showDialog(dialog);
+    }
+
+    private void showInvalidDialog(
+        @NotNull Player player,
+        @NotNull PollBuildSession session
+    ) {
+        ValidationSummary summary = validate(session);
+        List<DialogBody> body = buildInvalidBody(session, summary);
+
+        var dialog = Dialog.create(b -> b.empty()
+            .base(DialogBase.builder(Component.text("Poll Builder (Issues Found)"))
+                .body(body)
+                .build())
+            .type(DialogType.confirmation(
+                ActionButton.create(
+                    Component.text("Go Back"),
+                    Component.text("Return to the builder wizard to fix any issues or make changes"),
+                    180,
+                    DialogAction.customClick((v, a) -> {
+                        this.navigator.open(player, PollBuildSession.Stage.GENERAL);
+                    }, ClickCallback.Options.builder().build())
+                ),
+                ActionButton.create(
+                    Component.text("Discard"),
+                    Component.text("Abandon this draft and exit the builder"),
+                    180,
+                    null
+                )
+            ))
+        );
+
+        player.showDialog(dialog);
+    }
+
+    private List<DialogBody> buildInvalidBody(
+        @NotNull PollBuildSession session,
+        @NotNull ValidationSummary summary
+    ) {
+        List<DialogBody> body = new ArrayList<>();
+        body.add(DialogBody.plainMessage(
+                Component.text("Found problem(s) with your poll:", NamedTextColor.RED)));
+        body.add(DialogBody.plainMessage(Component.empty()));
+
+        if (summary.missingQuestion) {
+            body.add(DialogBody.plainMessage(Component.text("• The question is empty.", NamedTextColor.GRAY)));
+        }
+
+        if (summary.notEnoughQuestions) {
+            body.add(DialogBody.plainMessage(Component.text("• You need at least 2 options.", NamedTextColor.GRAY)));
+        }
+
+        if (summary.multiMaxTooHigh) {
+            body.add(DialogBody.plainMessage(Component.text(
+                    "• Max selections exceeds the number of options ("
+                            + session.getMaxSelections() + " > " + summary.optionCount + ").",
+                    NamedTextColor.GRAY)));
+        }
+
+        body.add(DialogBody.plainMessage(Component.empty()));
+        body.add(DialogBody.plainMessage(Component.text("Use ‘Go Back’ to correct these issues!", NamedTextColor.AQUA)));
+
+        return body;
+    }
+
+    private ValidationSummary validate(@NotNull PollBuildSession session) {
+        ValidationSummary summary = new ValidationSummary();
+
+        String q = Objects.requireNonNullElse(session.getQuestionRaw(), "").trim();
+        summary.missingQuestion = q.isBlank();
+
+        List<PollOption> options = session.getAnswers();
+        summary.optionCount = options.size();
+        summary.notEnoughQuestions = summary.optionCount < 2;
+
+        int maxSel = session.getMaxSelections();
+        summary.multiMaxTooHigh = session.isMultipleChoice() && maxSel > summary.optionCount;
+
+        return summary;
+    }
+
+    @Getter
+    @Setter
+    private static final class ValidationSummary {
+        boolean missingQuestion;
+        boolean notEnoughQuestions;
+        boolean multiMaxTooHigh;
+        int optionCount;
     }
 
 }

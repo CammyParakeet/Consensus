@@ -38,17 +38,29 @@ public interface PollManager extends Manager {
     void startBuildSession(@NotNull Player player, @Nullable String suppliedId);
 
     /**
-     * Creates a new {@link Poll} from a completed build session
+     * Constructs a {@link Poll} object from a build session
      *
-     * @param creator the player who is creating the poll
-     * @param session the completed build session state
-     * @return the unique id of the created poll
-     * @throws IllegalArgumentException if the session is invalid (e.g. missing question or options)
+     * @param creator The author of this poll
+     * @param session The build wizard session
+     * @return The built poll instance
+     * @throws IllegalArgumentException if session is invalid (e.g. missing question or options)
      */
-    CompletableFuture<UUID> createFromBuildSession(
+    @NotNull Poll buildFromSession(
         @NotNull Player creator,
         @NotNull PollBuildSession session
-    ) throws IllegalArgumentException;
+    );
+
+    /**
+     * Registers a new {@link Poll}
+     *
+     * @param creator the author of the poll
+     * @param poll the poll instance
+     * @return the unique id of the created poll
+     */
+    CompletableFuture<UUID> registerPoll(
+        @NotNull Player creator,
+        @NotNull Poll poll
+    );
 
     /**
      * Gets the runtime wrapper for a poll by its id

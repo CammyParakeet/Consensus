@@ -3,19 +3,20 @@ package com.glance.consensus.platform.paper.polls.display.book;
 import com.glance.consensus.platform.paper.polls.display.book.utils.AlignmentUtils;
 import com.glance.consensus.platform.paper.polls.display.book.utils.TextAlign;
 import com.glance.consensus.platform.paper.polls.display.book.builder.BookBuilder;
-import com.glance.consensus.platform.paper.polls.display.book.builder.ClickMode;
 import com.glance.consensus.platform.paper.polls.display.book.utils.TruncationUtils;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
+import com.glance.consensus.platform.paper.polls.domain.PollOption;
+import com.glance.consensus.platform.paper.polls.domain.PollRules;
 import com.glance.consensus.platform.paper.polls.runtime.PollRuntime;
 import com.glance.consensus.platform.paper.utils.ComponentUtils;
 import com.glance.consensus.platform.paper.utils.Mini;
 import lombok.experimental.UtilityClass;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,18 +25,13 @@ import java.util.Set;
 @UtilityClass
 public class PollBookViews {
 
-    private final Component SMALL_GAP = Component.text("-                         -");
-
-    private final int TARGET_OPTIONS = 6;
-    private final int LINES_PER_OPTION_MISSING = 2;
-    private final int BASE_SPACER = 1;
-
     public ItemStack buildVotingBook(
-        @NotNull Player viewer,
-        @NotNull PollRuntime runtime,
-        @NotNull ClickMode mode
+            @NotNull Player viewer,
+            @NotNull PollRuntime runtime,
+            @Nullable PollRules effectiveRules
     ) {
         var poll = runtime.getPoll();
+        var finalRules = effectiveRules != null ? effectiveRules : poll.getRules();
 
         var builder = new BookBuilder()
             .setTitle(Mini.parseMini("Poll: " + poll.getQuestionRaw()))
@@ -108,7 +104,7 @@ public class PollBookViews {
                 if (!ComponentUtils.isVisuallyEmpty(tt)) tt = Component
                         .text("").appendNewline().append(tt);
 
-                hoverComp = Mini.parseMini(opt.labelRaw()).append(tt);
+                hoverComp = Mini.parseMini(opt.labelRaw()).append(Component.text("\n\n"), tt);
             } else {
                 hoverComp = tt;
             }
@@ -158,6 +154,13 @@ public class PollBookViews {
         @NotNull PollRuntime runtime
     ) {
         return null;
+    }
+
+    private @NotNull List<Component> formatResultsPage(@NotNull PollRuntime runtime) {
+        final Poll poll = runtime.getPoll();
+        final List<PollOption> options = poll.getOptions();
+
+        return List.of();
     }
 
     private Component emptyLine() { return Component.newline(); }

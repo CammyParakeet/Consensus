@@ -1,3 +1,8 @@
 package com.glance.consensus.platform.paper.polls.domain;
 
-public record PollRules(boolean multipleChoice, int maxSelections, boolean allowResubmissions) {}
+public record PollRules(
+        boolean multipleChoice,
+        int maxSelections,
+        boolean allowResubmissions,
+        boolean canViewResults
+) {}

@@ -2,9 +2,7 @@ package com.glance.consensus.platform.paper.commands.impl.core;
 
 import com.glance.consensus.platform.paper.commands.engine.CommandHandler;
 import com.glance.consensus.platform.paper.polls.display.book.PollBookViews;
-import com.glance.consensus.platform.paper.polls.display.book.builder.ClickMode;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
-import com.glance.consensus.platform.paper.polls.domain.PollRules;
 import com.glance.consensus.platform.paper.polls.persistence.PollStorage;
 import com.glance.consensus.platform.paper.polls.runtime.PollManager;
 import com.glance.consensus.platform.paper.polls.runtime.PollRuntime;
@@ -115,55 +113,26 @@ public class AdminPollCommands implements CommandHandler {
             return;
         }
 
-        ItemStack book = PollBookViews.buildVotingBook(player, rtOpt.get(), ClickMode.CALLBACKS);
+        // TODO use the display manager
+        ItemStack book = PollBookViews.buildVotingBook(player, rtOpt.get(), null);
         player.openBook(book);
     }
 
-    @Command("poll vote <id> <answer>")
-    @Permission("consensus.polls.vote")
-    public void addPollVote(
-        @NotNull Player player,
-        @NotNull @Argument(value = "id", suggestions = "pollIds") String id,
-        @NotNull @Argument(value = "answer") Integer index
+    @Command("poll close <id>")
+    @Permission("consemsus.polls.close")
+    public void closePoll(
+        @NotNull CommandSender sender,
+        @NotNull @Argument(value = "id", suggestions = "pollIds") String id
     ) {
         var targetId = resolvePollId(id);
         if (targetId.isEmpty()) {
-            // todo
+            sender.sendMessage("Unknown poll id: " + id);
             return;
         }
 
-        var rtOpt = manager.get(targetId.get());
-        if (rtOpt.isEmpty()) {
-            // todo
-            return;
-        }
-
-        PollRuntime rt = rtOpt.get();
-        Poll poll = rt.getPoll();
-        if (poll.isClosed()) {
-            // todo
-            return;
-        }
-
-        var options = poll.getOptions();
-        if (index < 0 || index >= options.size()) {
-            // todo
-            return;
-        }
-
-        UUID voter = player.getUniqueId();
-        Set<Integer> current = rt.selectionSnapshot(voter);
-        Set<Integer> next = new HashSet<>(current);
-        PollRules rules = poll.getRules();
-
-        // todo handle rules
-
-        boolean accepted = rt.vote(voter, next);
-        if (!accepted) {
-            // todo
-            return;
-        }
+        this.manager.close(targetId.get());
     }
+
 
     @Command("poll delete <id>")
     @Permission("consensus.polls.delete")
@@ -181,21 +150,22 @@ public class AdminPollCommands implements CommandHandler {
             sender.sendMessage("Deleted poll " + id));
     }
 
-    @Command("poll list <option>")
+    @Command("poll list [option]")
     @Permission("consensus.polls.list")
     public void listPolls(
         @NotNull CommandSender sender,
-        @NotNull @Argument("option") ListOption listOption
+        @Nullable @Argument("option") ListOption listOption
     ) {
         Instant now = Instant.now();
-        List<PollRuntime> items = switch (listOption) {
+        var option = listOption != null ? listOption : ListOption.ALL;
+        List<PollRuntime> items = switch (option) {
             case ACTIVE -> sort(manager.active());
             case CLOSED -> sort(manager.closed());
             case ALL -> sort(manager.all());
         };
 
         if (items.isEmpty()) {
-            sender.sendMessage(switch (listOption) {
+            sender.sendMessage(switch (option) {
                 case ACTIVE -> "No active polls";
                 case CLOSED -> "No closed polls";
                 case ALL -> "No polls found";
@@ -205,7 +175,7 @@ public class AdminPollCommands implements CommandHandler {
 
         if (sender instanceof Player player) {
             List<Component> lines = new ArrayList<>();
-            lines.add(mm(switch (listOption) {
+            lines.add(mm(switch (option) {
                 case ACTIVE -> "<gold><bold>Active Polls (" + items.size() + ")</bold></gold>";
                 case CLOSED -> "<gold><bold>Closed Polls (" + items.size() + ")</bold></gold>";
                 case ALL -> "<gold><bold>All Polls (" + items.size() + ")</bold></gold>";
@@ -237,7 +207,7 @@ public class AdminPollCommands implements CommandHandler {
 
             player.sendMessage(Component.join(JoinConfiguration.newlines(), lines));
         } else {
-            String header = switch (listOption) {
+            String header = switch (option) {
                 case ACTIVE -> "Active Polls (" + items.size() + ")";
                 case CLOSED -> "Closed Polls (" + items.size() + ")";
                 case ALL -> "All Polls (" + items.size() + ")";
@@ -274,11 +244,20 @@ public class AdminPollCommands implements CommandHandler {
                 .min(Comparator.comparing(rt -> rt.getPoll().getClosesAt()))
                 .map(rt -> rt.getPoll().getId());
         }
+
+        Optional<UUID> asUuid = Optional.empty();
         try {
-            return Optional.of(UUID.fromString(raw));
-        } catch (IllegalArgumentException ex) {
-            return Optional.empty();
-        }
+            asUuid = Optional.of(UUID.fromString(raw));
+        } catch (IllegalArgumentException ignored) {}
+        if (asUuid.isPresent()) return asUuid;
+
+        return manager.all()
+                .stream()
+                .map(PollRuntime::getPoll)
+                .filter(p -> raw.trim().equals(p.getPollIdentifier()))
+                .sorted(Comparator.comparing(Poll::getCreatedAt).reversed())
+                .map(Poll::getId)
+                .findFirst();
     }
 
     // TODO move these to a proper util

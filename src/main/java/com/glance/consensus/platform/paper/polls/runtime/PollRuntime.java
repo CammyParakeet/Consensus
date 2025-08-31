@@ -1,5 +1,6 @@
 package com.glance.consensus.platform.paper.polls.runtime;
 
+import com.glance.consensus.platform.paper.polls.display.PollDisplay;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.domain.PollOption;
 import com.glance.consensus.platform.paper.polls.domain.PollRules;
@@ -26,6 +27,10 @@ public final class PollRuntime {
     /** The backing poll definition (mutable vote counts, closed flag) */
     @Getter
     private final Poll poll;
+
+    // todo a future impl could have more display modes
+    @Getter
+    private final PollDisplay.Mode mode = PollDisplay.Mode.BOOK;
 
     // voterId -> indices chosen
     private final Map<UUID, Set<Integer>> votes = new ConcurrentHashMap<>();

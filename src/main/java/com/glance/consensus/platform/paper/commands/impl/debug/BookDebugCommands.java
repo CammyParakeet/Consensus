@@ -2,8 +2,6 @@ package com.glance.consensus.platform.paper.commands.impl.debug;
 
 import com.glance.consensus.platform.paper.commands.engine.CommandHandler;
 import com.glance.consensus.platform.paper.polls.display.book.PollBookViews;
-import com.glance.consensus.platform.paper.polls.display.book.builder.ClickMode;
-import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.runtime.PollManager;
 import com.google.auto.service.AutoService;
 import com.google.inject.Inject;
@@ -74,7 +72,7 @@ public class BookDebugCommands implements CommandHandler {
             return;
         }
 
-        ItemStack book = PollBookViews.buildVotingBook(player, poll.get(), ClickMode.CALLBACKS);
+        ItemStack book = PollBookViews.buildVotingBook(player, poll.get(), null);
         player.openBook(book);
     }
 

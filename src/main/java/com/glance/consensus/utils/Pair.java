@@ -1,12 +1,14 @@
 package com.glance.consensus.utils;
 
 import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Map;
 
+@ToString
 @RequiredArgsConstructor
 public final class Pair<A, B> implements Map.Entry<A, B>, Serializable {
 
@@ -34,4 +36,5 @@ public final class Pair<A, B> implements Map.Entry<A, B>, Serializable {
     public B setValue(B value) {
         throw new UnsupportedOperationException();
     }
+
 }

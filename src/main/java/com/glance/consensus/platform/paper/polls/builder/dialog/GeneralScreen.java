@@ -44,6 +44,7 @@ public final class GeneralScreen implements PollBuildScreen {
     private static final String K_MULTI_CHOICE = "multi_choice";
     private static final String K_MAX_SELECTIONS = "max_selections";
     private static final String K_ALLOW_RESUBMIT = "allow_resubmit";
+    private static final String K_HIDE_RESULTS = "hide_results";
 
     private static final String K_BUMP_DELTA = "delta";
 
@@ -86,18 +87,13 @@ public final class GeneralScreen implements PollBuildScreen {
             )
             .type(DialogType.multiAction(getPollOptionButtons(session))
                 .exitAction(ActionButton.create(
-                Component.text("Create"),
-                Component.text("Click to submit this poll!"),
+                Component.text("Continue"),
+                Component.text("Click to review and submit your poll!"),
                 120,
                 DialogAction.customClick((v, a) -> {
                     if (!(a instanceof Player p)) return;
                     updateSession(session, v, p);
-
-                    try {
-                        this.pollManager.createFromBuildSession(player, session);
-                    } catch (Exception e) {
-                        player.sendMessage(e.getMessage());
-                    }
+                    this.navigator.open(player, PollBuildSession.Stage.CONFIRM);
                 }, ClickCallback.Options.builder()
                         .uses(1)
                         .lifetime(ClickCallback.DEFAULT_LIFETIME).build())
@@ -147,11 +143,15 @@ public final class GeneralScreen implements PollBuildScreen {
         Boolean allowResubmitRaw = view.getBoolean(K_ALLOW_RESUBMIT);
         boolean allowResubmit = allowResubmitRaw != null ? allowResubmitRaw : true;
 
+        Boolean hideResults = view.getBoolean(K_HIDE_RESULTS);
+        boolean showResults = hideResults == null || !hideResults;
+
         // Update session
         session.setQuestionRaw(question);
         session.setMultipleChoice(multiple);
         session.setMaxSelections(maxSel);
         session.setAllowResubmission(allowResubmit);
+        session.setViewResults(showResults);
     }
 
     private List<ActionButton> getPollOptionButtons(@NotNull PollBuildSession session) {
@@ -252,6 +252,10 @@ public final class GeneralScreen implements PollBuildScreen {
             DialogInput.bool(K_ALLOW_RESUBMIT,
                             Component.text("Allow Resubmission (single-answer only)"))
                     .initial(session.isAllowResubmission())
+                    .build(),
+
+            DialogInput.bool(K_HIDE_RESULTS, Component.text("Hide Results"))
+                    .initial(!session.isViewResults())
                     .build()
         );
     }

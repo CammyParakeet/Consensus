@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 @Slf4j
 @Singleton
@@ -32,6 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class DefaultPollManager implements PollManager {
 
     private final Plugin plugin;
+    private final Logger logger;
 
     // TODO: add to config
     private static final Duration CLOSED_RETENTION = Duration.ofDays(3);
@@ -57,6 +59,7 @@ public final class DefaultPollManager implements PollManager {
         @NotNull final Provider<PollStorage> storage
     ) {
         this.plugin = plugin;
+        this.logger = plugin.getLogger();
         this.navigator = navigator;
         this.sessions = sessions;
         this.storageProvider = storage;
@@ -75,10 +78,10 @@ public final class DefaultPollManager implements PollManager {
     }
 
     @Override
-    public CompletableFuture<UUID> createFromBuildSession(
+    public @NotNull Poll buildFromSession(
         @NotNull Player creator,
         @NotNull PollBuildSession session
-    ) throws IllegalArgumentException {
+    ) {
         String question = Objects.requireNonNullElse(session.getQuestionRaw(), "").trim();
         if (question.isBlank()) throw new IllegalArgumentException("Question cannot be empty");
         if (session.getAnswers().size() < 2) throw new IllegalArgumentException("At least 2 options are required");
@@ -93,9 +96,10 @@ public final class DefaultPollManager implements PollManager {
 
         int minutes = Math.max(1, session.resolveDurationMins()); // min 1 minute
         var rules = new PollRules(
-            session.isMultipleChoice(),
-            Math.max(1, Math.min(PollBuildSession.MAX_OPTIONS, session.getMaxSelections())),
-            session.isAllowResubmission()
+                session.isMultipleChoice(),
+                Math.max(1, Math.min(PollBuildSession.MAX_OPTIONS, session.getMaxSelections())),
+                session.isAllowResubmission(),
+                session.isViewResults()
         );
 
         UUID id = UUID.randomUUID();
@@ -103,22 +107,27 @@ public final class DefaultPollManager implements PollManager {
         Instant closeAt = now.plus(Duration.ofMinutes(minutes));
 
         var poll = new Poll(
-            id,
-            session.getSuppliedId() != null ? session.getSuppliedId() : id.toString(),
-            creator.getUniqueId(),
-            question,
-            now,
-            closeAt,
-            null,
-            normalized,
-            rules
+                id,
+                session.getSuppliedId() != null ? session.getSuppliedId() : id.toString(),
+                creator.getUniqueId(),
+                question,
+                now,
+                closeAt,
+                null,
+                normalized,
+                rules
         );
         poll.setClosed(false);
 
+        return poll;
+    }
+
+    @Override
+    public CompletableFuture<UUID> registerPoll(@NotNull Player creator, @NotNull Poll poll) {
         return storageProvider.get().createPoll(poll).thenApply(p -> {
             var runtime = new PollRuntime(poll);
-            polls.put(id, runtime);
-            return id;
+            polls.put(poll.getId(), runtime);
+            return poll.getId();
         });
     }
 
@@ -146,12 +155,12 @@ public final class DefaultPollManager implements PollManager {
     public boolean close(@NotNull UUID pollId) {
         var runtime = polls.get(pollId);
         if (runtime == null) return false;
-        return safeClose(runtime.getPoll());
+        return safeClose(runtime.getPoll(), Instant.now());
     }
 
-    private boolean safeClose(@NotNull Poll poll) {
+    private boolean safeClose(@NotNull Poll poll, Instant closeTime) {
         UUID id = poll.getId();
-        storageProvider.get().closePoll(id, Instant.now())
+        storageProvider.get().closePoll(id, closeTime)
                 .thenRun(() -> {
                     // TODO
                 })
@@ -177,11 +186,10 @@ public final class DefaultPollManager implements PollManager {
         if (storage == null) throw new IllegalStateException("A Storage system was not initialized");
 
         storage.loadRecentPolls(CLOSED_RETENTION).thenAccept(list -> {
+            if (list == null) return;
             List<CompletableFuture<Void>> voteLoadFutures = new ArrayList<>(list.size());
 
             for (Poll p : list) {
-                PollRuntime r = new PollRuntime(p);
-
                 var future = storage.loadAllSelections(p.getId())
                     .thenAccept(selections -> {
                         PollRuntime rt = polls.computeIfAbsent(p.getId(), __ -> new PollRuntime(p));
@@ -223,6 +231,10 @@ public final class DefaultPollManager implements PollManager {
 
                     return null;
                 });
+        })
+        .exceptionally(ex -> {
+            logger.warning("Failed to load recent polls: " + ex.getMessage());
+            return null;
         });
     }
 
@@ -239,7 +251,7 @@ public final class DefaultPollManager implements PollManager {
                 .filter(p -> !p.isClosed() && !now.isBefore(p.getClosesAt()))
                 .toList();
 
-        due.forEach(this::safeClose);
+        due.forEach(p -> safeClose(p, p.getClosesAt()));
     }
 
     private void reapOldPolls() {

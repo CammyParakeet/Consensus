@@ -17,7 +17,7 @@ public final class PollBuildSession {
 
     public static final int MAX_OPTIONS = 6;
 
-    public enum Stage { GENERAL, ANSWER, PREVIEW, OVERRIDE }
+    public enum Stage { GENERAL, ANSWER, CONFIRM, OVERRIDE }
 
     private final UUID playerId;
     private Stage stage = Stage.GENERAL;
@@ -34,6 +34,7 @@ public final class PollBuildSession {
     private boolean multipleChoice = false; // default to single-answer
     private int maxSelections = 1; // capped to 1 if multipleChoice = false, and to MAX_OPTIONS
     private boolean allowResubmission = false; // only respected for single-answer polls
+    private boolean viewResults = true;
 
     private int editingIndex = 0;
 

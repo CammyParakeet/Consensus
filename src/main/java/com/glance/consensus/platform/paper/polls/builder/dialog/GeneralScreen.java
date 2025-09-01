@@ -34,7 +34,6 @@ import java.util.List;
 public final class GeneralScreen implements PollBuildScreen {
 
     private final PollBuildNavigator navigator;
-    private final PollManager pollManager;
 
     private static final String K_QUESTION = "poll_question";
     private static final String K_PRESET_DURATION = "duration_preset";
@@ -53,11 +52,9 @@ public final class GeneralScreen implements PollBuildScreen {
 
     @Inject
     public GeneralScreen(
-        @NotNull final PollBuildNavigator navigator,
-        @NotNull final PollManager pollManager
+        @NotNull final PollBuildNavigator navigator
     ) {
        this.navigator = navigator;
-       this.pollManager = pollManager;
     }
 
     @Override
@@ -91,8 +88,7 @@ public final class GeneralScreen implements PollBuildScreen {
                 Component.text("Click to review and submit your poll!"),
                 120,
                 DialogAction.customClick((v, a) -> {
-                    if (!(a instanceof Player p)) return;
-                    updateSession(session, v, p);
+                    updateSession(session, v);
                     this.navigator.open(player, PollBuildSession.Stage.CONFIRM);
                 }, ClickCallback.Options.builder()
                         .uses(1)
@@ -108,12 +104,10 @@ public final class GeneralScreen implements PollBuildScreen {
 
     private void updateSession(
         @NotNull PollBuildSession session,
-        @NotNull DialogResponseView view,
-        @NotNull Player player
+        @NotNull DialogResponseView view
     ) {
         String question = view.getText(K_QUESTION);
         if (question == null || question.isBlank()) {
-            player.sendMessage(Component.text("Poll Question Cannot Be Empty!", NamedTextColor.RED));
             return;
         }
 
@@ -178,7 +172,7 @@ public final class GeneralScreen implements PollBuildScreen {
             buttons.add(ActionButton.create(display, tooltip, 256,
                     DialogAction.customClick((v, a) -> {
                         if (!(a instanceof Player p)) return;
-                        updateSession(session, v, p);
+                        updateSession(session, v);
                         session.setEditingIndex(idx);
                         navigator.open(p, PollBuildSession.Stage.ANSWER);
                     }, ClickCallback.Options.builder()
@@ -192,7 +186,7 @@ public final class GeneralScreen implements PollBuildScreen {
                 256,
                 DialogAction.customClick((v, a) -> {
                     if (!(a instanceof Player p)) return;
-                    updateSession(session, v, p);
+                    updateSession(session, v);
                     this.navigator.open(p, PollBuildSession.Stage.ANSWER);
                 }, ClickCallback.Options.builder()
                         .uses(1).lifetime(ClickCallback.DEFAULT_LIFETIME).build())

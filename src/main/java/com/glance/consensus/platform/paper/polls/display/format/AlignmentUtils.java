@@ -1,4 +1,4 @@
-package com.glance.consensus.platform.paper.polls.display.book.utils;
+package com.glance.consensus.platform.paper.polls.display.format;
 
 import com.glance.consensus.platform.paper.utils.ComponentUtils;
 import com.glance.consensus.platform.paper.utils.Mini;
@@ -77,6 +77,32 @@ public class AlignmentUtils {
         Component aligned = alignComponent(c, align, MAX_PIXEL_WIDTH);
 
         return new TruncationUtils.TruncateResult(aligned, result.truncated());
+    }
+
+    public TruncationUtils.TruncateResult alignSides(
+        @NotNull String leftRaw,
+        @NotNull String rightRaw
+    ) {
+        final Component left = Mini.parseMini(leftRaw);
+        final Component right = Mini.parseMini(rightRaw);
+
+        final int spacePx = glyphWidth(' ', false);
+        final int leftPx = pixelWidth(left);
+        final int rightPx = pixelWidth(right);
+
+        final int minTotalPx = leftPx + spacePx + rightPx;
+
+        if (minTotalPx > MAX_PIXEL_WIDTH) {
+            return alignAndTruncate(leftRaw + " " + rightRaw, TextAlign.LEFT);
+        }
+
+        int remainingPx = MAX_PIXEL_WIDTH - (leftPx + rightPx);
+        int gapSpaces = Math.max(1, remainingPx / spacePx);
+
+        Component gap = Component.text(" ".repeat(gapSpaces));
+        Component combined = Component.empty().append(left).append(gap).append(right);
+
+        return new TruncationUtils.TruncateResult(combined, false);
     }
 
     public int widthOfComponent(@NotNull Component component, boolean inheritedBold) {

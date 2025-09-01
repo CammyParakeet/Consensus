@@ -1,4 +1,4 @@
-package com.glance.consensus.platform.paper.polls.display.book.utils;
+package com.glance.consensus.platform.paper.polls.display.format;
 
 /**
  * Commonly used text symbols for formatting, decoration, and visual markers

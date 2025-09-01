@@ -79,9 +79,7 @@ public final class BookPollDisplay implements PollDisplay {
 
         /* Handling Poll Answers */ // todo need effective rules?
         page.addAll(PollTextFormatter.formatAnswers(
-                viewer,
                 poll,
-                finalRules,
                 PollTextFormatter.Options.voting(),
                 runtime.selectionSnapshot(viewer.getUniqueId())));
 

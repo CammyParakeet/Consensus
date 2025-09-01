@@ -1,4 +1,4 @@
-package com.glance.consensus.platform.paper.polls.display.book.utils;
+package com.glance.consensus.platform.paper.polls.display.format;
 
 /**
  * Text utils modes for rendering within book pages or other constrained UIs

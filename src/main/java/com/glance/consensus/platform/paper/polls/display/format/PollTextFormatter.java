@@ -1,11 +1,8 @@
 package com.glance.consensus.platform.paper.polls.display.format;
 
-import com.glance.consensus.platform.paper.polls.display.book.utils.AlignmentUtils;
-import com.glance.consensus.platform.paper.polls.display.book.utils.TextAlign;
-import com.glance.consensus.platform.paper.polls.display.book.utils.TruncationUtils;
+import com.glance.consensus.platform.paper.polls.display.book.builder.BookUtils;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.domain.PollRules;
-import com.glance.consensus.platform.paper.polls.runtime.PollRuntime;
 import com.glance.consensus.platform.paper.utils.ComponentUtils;
 import com.glance.consensus.platform.paper.utils.Mini;
 import lombok.Data;
@@ -23,7 +20,6 @@ import java.util.Set;
 @UtilityClass
 public class PollTextFormatter {
 
-    private final Component SMALL_GAP = Component.text("-                         -");
     private final int TARGET_OPTIONS = 6;
     private final int LINES_PER_OPTION_MISSING = 2;
 
@@ -67,8 +63,9 @@ public class PollTextFormatter {
         Component questionTooltip = Component.empty();
 
         if (!options.preview) {
-            String amountMsg = (finalRules.multipleChoice() && finalRules.maxSelections() > 1) ? "one or multiple" : "one";
-            questionTooltip = Mini.parseMini("<dark_gray>Select " + amountMsg + " answers to vote for");
+            String amountMsg = (finalRules.multipleChoice() && finalRules.maxSelections() > 1)
+                    ? "one or multiple answers" : "one answer";
+            questionTooltip = Mini.parseMini("<dark_gray>Select " + amountMsg + " to vote for");
         }
 
         var questionParsed = center(poll.getQuestionRaw());
@@ -95,63 +92,65 @@ public class PollTextFormatter {
 
     // TODO: add click event to vote!!
     public List<Component> formatAnswers(
-            @NotNull Player viewer,
             @NotNull Poll poll,
-            @NotNull PollRules finalRules,
             @NotNull Options options,
             @Nullable Set<Integer> viewerVotes
     ) {
         List<Component> answers = new ArrayList<>();
 
-        // Center if we have missing answers
-        int answerCount = poll.getOptions().size();
-        int missing = Math.max(0, TARGET_OPTIONS - answerCount);
-        int extraPad = (missing * LINES_PER_OPTION_MISSING) / 2;
-        for (int i = 0; i < extraPad; i++) {
-            answers.add(Component.empty());
+        if (!options.preview) {
+            // Center if we have missing answers
+            int answerCount = poll.getOptions().size();
+            int missing = Math.max(0, TARGET_OPTIONS - answerCount);
+            int extraPad = ((missing * LINES_PER_OPTION_MISSING) / 2) - 1;
+            for (int i = 0; i < extraPad; i++) answers.add(Component.empty());
         }
 
-        //final Set<Integer> viewerVotes = runtime.selectionSnapshot(viewer.getUniqueId());
+        final Set<Integer> voted = (viewerVotes != null) ? viewerVotes : Set.of();
 
         for (var opt : poll.getOptions()) {
-            answers.add(SMALL_GAP);
+            answers.add(BookUtils.SIDE_DIVIDER);
 
             final int idx = opt.index();
-            final boolean selected = viewerVotes.contains(idx);
+            final boolean selected = voted.contains(idx);
 
-            final String prefix = selected ? "[✓] " : "[ ] ";
-            final String displayRaw = prefix + opt.labelRaw();
+            final String badge = VoteBadgeUtils.voteBadgeRaw(
+                    selected,
+                    VoteBadgeUtils.VoteStyle.CHECKBOX,
+                    VoteBadgeUtils.Theme.defaultVote());
 
-            Component tt = opt.tooltipRaw() != null
+            var answerParsed = sides(badge, opt.labelRaw());
+
+            Component tooltip = opt.tooltipRaw() != null
                     ? Mini.parseMini(opt.tooltipRaw())
                     : Component.empty();
 
-            var answerParsed = center(displayRaw);
             Component hoverComp;
-            if (answerParsed.truncated()) {
-                if (!ComponentUtils.isVisuallyEmpty(tt)) tt = Component
-                        .text("").appendNewline().append(tt);
-
-                hoverComp = Mini.parseMini(opt.labelRaw()).append(fullNewline(), tt);
+            if (answerParsed.truncated() && !ComponentUtils.isVisuallyEmpty(tooltip)) {
+                hoverComp = Mini.parseMini(opt.labelRaw()).append(fullNewline(), tooltip);
             } else {
-                hoverComp = tt;
+                hoverComp = tooltip;
             }
 
-            final Component actionHint = buildActionHint(poll, selected);
-            final Component fullHoverComp = Component.text()
-                    .append(hoverComp, fullNewline(), actionHint).build();
+            final Component actionHint = options.preview ? Component.empty() : buildActionHint(poll, selected);
+            final Component fullHoverComp = ComponentUtils.isVisuallyEmpty(hoverComp) ? actionHint
+                    : Component.text().append(hoverComp, fullNewline(), actionHint).build();
 
             Component line = answerParsed.value().hoverEvent(fullHoverComp);
-            line = line.clickEvent(ClickEvent.callback(a -> {
-                if (!(a instanceof Player p)) return;
 
-                p.sendMessage("You voted for " + poll.getPollIdentifier());
-                p.performCommand("poll vote " + poll.getPollIdentifier() + " " + idx);
-            }));
+            if (!options.preview) {
+                line = line.clickEvent(ClickEvent.callback(a -> {
+                    if (!(a instanceof Player p)) return;
+
+                    p.sendMessage("You voted for " + poll.getPollIdentifier());
+
+                    // TODO actual vote
+                }));
+            }
 
             answers.add(line);
         }
-        answers.add(SMALL_GAP);
+        answers.add(BookUtils.SIDE_DIVIDER);
 
         return answers;
     }
@@ -178,6 +177,10 @@ public class PollTextFormatter {
 
     private Component fullNewline() {
         return Component.text("\n\n");
+    }
+
+    private TruncationUtils.TruncateResult sides(@NotNull String left, @NotNull String right) {
+        return  AlignmentUtils.alignSides(left, right);
     }
 
     private TruncationUtils.TruncateResult center(@NotNull String raw) {

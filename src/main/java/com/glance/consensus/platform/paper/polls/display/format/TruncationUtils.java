@@ -1,4 +1,4 @@
-package com.glance.consensus.platform.paper.polls.display.book.utils;
+package com.glance.consensus.platform.paper.polls.display.format;
 
 import com.glance.consensus.platform.paper.utils.ComponentUtils;
 import com.glance.consensus.platform.paper.utils.Mini;

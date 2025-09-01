@@ -3,9 +3,14 @@ package com.glance.consensus.platform.paper.polls.builder.dialog;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildScreen;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildSession;
+import com.glance.consensus.platform.paper.polls.display.book.builder.BookUtils;
+import com.glance.consensus.platform.paper.polls.display.format.AlignmentUtils;
+import com.glance.consensus.platform.paper.polls.display.format.PollTextFormatter;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.domain.PollOption;
+import com.glance.consensus.platform.paper.polls.domain.PollRules;
 import com.glance.consensus.platform.paper.polls.runtime.PollManager;
+import com.glance.consensus.platform.paper.utils.Mini;
 import com.google.auto.service.AutoService;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
@@ -20,6 +25,7 @@ import lombok.Setter;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickCallback;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -28,6 +34,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Singleton
 @AutoService(PollBuildScreen.class)
@@ -52,9 +59,9 @@ public final class ConfirmScreen implements PollBuildScreen {
 
     private ItemStack getConfirmIcon() {
         ItemStack icon = ItemStack.of(Material.LECTERN);
-        icon.editMeta(meta -> {
-            meta.displayName(Component.text("Review & Submit", NamedTextColor.GOLD));
-        });
+        icon.editMeta(meta ->
+            meta.displayName(Component.text("Review & Submit", NamedTextColor.GOLD)
+            .decoration(TextDecoration.ITALIC, false)));
 
         return icon;
     }
@@ -73,45 +80,96 @@ public final class ConfirmScreen implements PollBuildScreen {
             return;
         }
 
-        // todo build preview
+        PollRules rules = poll.getRules();
+        var formatOpt = PollTextFormatter.Options.preview();
+
+        List<Component> preview = new ArrayList<>();
+        preview.add(emptyLine());
+        preview.addAll(PollTextFormatter.formatQuestion(poll, rules, formatOpt));
+        preview.add(emptyLine());
+        preview.addAll(PollTextFormatter.formatAnswers(poll, formatOpt, Set.of()));
+        preview.add(emptyLine());
+
+        List<DialogBody> previewBodies = new ArrayList<>();
+        previewBodies.add(DialogBody.item(getConfirmIcon()).build());
+        previewBodies.add(DialogBody.plainMessage(
+                Component.text("Please review your poll, then click Submit.",
+                        NamedTextColor.AQUA).hoverEvent(buildFormattingHelp()), 300));
+        previewBodies.add(DialogBody.plainMessage(emptyLine()));
+        previewBodies.add(DialogBody.plainMessage(BookUtils.DIVIDER));
+
+        for (Component c : preview) {
+            previewBodies.add(DialogBody.plainMessage(c));
+        }
+        previewBodies.add(DialogBody.plainMessage(Mini.parseMini("<u><gray>Poll Rules")
+                .hoverEvent(buildRulesHover(rules))));
+        previewBodies.add(DialogBody.plainMessage(emptyLine()));
+        previewBodies.add(DialogBody.plainMessage(BookUtils.DIVIDER));
+        previewBodies.add(DialogBody.plainMessage(emptyLine()));
+        previewBodies.add(DialogBody.plainMessage(emptyLine()));
 
         Dialog dialog = Dialog.create(b -> b.empty()
             // todo config for some of these specifics?
             .base(DialogBase.builder(Component.text("Poll Builder (Submit)"))
-                .body(List.of(
-                    DialogBody.item(getConfirmIcon()).build(),
-                    DialogBody.plainMessage(
-                            Component.text("Please review your poll, then click Submit.",
-                                    NamedTextColor.AQUA)),
-                    DialogBody.plainMessage(
-                            Component.text("Below is a preview of your poll"))
-                ))
+                .body(previewBodies)
                 .build())
-            .type(DialogType.confirmation(
-                ActionButton.create(
-                    Component.text("Submit"),
-                    Component.text("Click to submit your current Poll Builder"),
-                    180,
-                    DialogAction.customClick((view, audience) -> {
-                        this.pollManager.registerPoll(player, poll);
-                    },
-                    ClickCallback.Options.builder()
+            .type(DialogType.multiAction(List.of(
+                    ActionButton.create(
+                        Component.text("Submit"),
+                        Component.text("Click to submit your current Poll Builder"),
+                        180,
+                        DialogAction.customClick((view, audience) -> {
+                            this.pollManager.registerPoll(player, poll);
+                        },
+                        ClickCallback.Options.builder()
                             .uses(1)
                             .lifetime(ClickCallback.DEFAULT_LIFETIME)
                             .build()
+                        )
+                    ),
+                    ActionButton.create(
+                        Component.text("Go Back"),
+                        Component.text("Return to the builder wizard"),
+                        180,
+                        DialogAction.customClick((v, a) -> {
+                            this.navigator.open(player, PollBuildSession.Stage.GENERAL);
+                        }, ClickCallback.Options.builder().build())
                     )
-                ),
-                ActionButton.create(
-                    Component.text("Exit"),
-                    Component.text("This will exit the builder wizard"),
-                    180,
-                    null
-                )
-            ))
+                ))
+                .exitAction(
+                    ActionButton.create(
+                        Component.text("Exit"),
+                        Component.text("This will exit the builder wizard"),
+                        180,
+                        null
+                ))
+                .build()
+            )
         );
 
         player.showDialog(dialog);
     }
+
+    private Component buildRulesHover(@NotNull PollRules r) {
+        return Component.text()
+                .append(Component.text("Multiple choice: ", NamedTextColor.GRAY))
+                .append(Component.text(r.multipleChoice() ? "Yes" : "No",
+                        r.multipleChoice() ? NamedTextColor.GREEN : NamedTextColor.RED))
+                .appendNewline()
+                .append(Component.text("Max selections: ", NamedTextColor.GRAY))
+                .append(Component.text(String.valueOf(r.maxSelections()), NamedTextColor.AQUA))
+                .appendNewline()
+                .append(Component.text("Show results: ", NamedTextColor.GRAY))
+                .append(Component.text(r.canViewResults() ? "Yes" : "No",
+                        r.canViewResults() ? NamedTextColor.GREEN : NamedTextColor.RED))
+                .appendNewline()
+                .append(Component.text("Allow resubmission: ", NamedTextColor.GRAY))
+                .append(Component.text(r.allowResubmissions() ? "Yes" : "No",
+                        r.allowResubmissions() ? NamedTextColor.GREEN : NamedTextColor.RED))
+                .build();
+    }
+
+    /* Invalid Screen */
 
     private void showInvalidDialog(
         @NotNull Player player,

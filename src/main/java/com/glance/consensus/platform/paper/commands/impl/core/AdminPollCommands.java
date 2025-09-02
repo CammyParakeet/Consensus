@@ -4,6 +4,7 @@ import com.glance.consensus.platform.paper.commands.engine.CommandHandler;
 import com.glance.consensus.platform.paper.polls.display.PollDisplayNavigator;
 import com.glance.consensus.platform.paper.polls.display.format.PollTextBuilder;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
+import com.glance.consensus.platform.paper.polls.domain.PollListOption;
 import com.glance.consensus.platform.paper.polls.domain.PollRules;
 import com.glance.consensus.platform.paper.polls.persistence.PollStorage;
 import com.glance.consensus.platform.paper.polls.runtime.PollManager;
@@ -36,10 +37,6 @@ import java.util.stream.Collectors;
 @AutoService(CommandHandler.class)
 public class AdminPollCommands implements CommandHandler {
 
-    public enum ListOption {
-        ALL, ACTIVE, CLOSED
-    }
-
     private final PollManager manager;
     private final PollStorage storage;
     private final PollDisplayNavigator displayNavigator;
@@ -61,11 +58,11 @@ public class AdminPollCommands implements CommandHandler {
         final String input
     ) {
         String prefix = input == null ? "" : input.toLowerCase(Locale.ROOT);
-        ListOption scope = ListOption.ACTIVE;
+        PollListOption scope = PollListOption.ACTIVE;
 
         if (ctx.contains("option")) {
             try {
-                scope = ListOption.valueOf(ctx.get("option").toString().toUpperCase(Locale.ROOT));
+                scope = PollListOption.valueOf(ctx.get("option").toString().toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException ignored) {}
         }
 
@@ -80,7 +77,7 @@ public class AdminPollCommands implements CommandHandler {
             .sorted()
             .collect(Collectors.toCollection(ArrayList::new));
 
-        if (scope == ListOption.ACTIVE || scope == ListOption.ALL) {
+        if (scope == PollListOption.ACTIVE || scope == PollListOption.ALL) {
             ids.addFirst("latest");
         }
 
@@ -204,10 +201,10 @@ public class AdminPollCommands implements CommandHandler {
     @Permission("consensus.polls.list")
     public void listPolls(
         @NotNull CommandSender sender,
-        @Nullable @Argument("option") ListOption listOption
+        @Nullable @Argument("option") PollListOption listOption
     ) {
         Instant now = Instant.now();
-        var option = listOption != null ? listOption : ListOption.ALL;
+        var option = listOption != null ? listOption : PollListOption.ALL;
         List<PollRuntime> items = switch (option) {
             case ACTIVE -> sort(manager.active());
             case CLOSED -> sort(manager.closed());
@@ -245,7 +242,7 @@ public class AdminPollCommands implements CommandHandler {
                     timeBit = "closed at <aqua>" + fmt(p.getClosesAt()) + "</aqua>";
                 } else {
                     var left = Duration.between(now, p.getClosesAt());
-                    timeBit = "closes in <aqua>" + humanize(left) + "</aqua>";
+                    timeBit = "closes in <aqua>" + PollTextBuilder.formatDuration(left) + "</aqua>";
                 }
 
                 Component row = mm("<yellow>" + (i++) + ".</yellow> " + status + " "
@@ -276,7 +273,7 @@ public class AdminPollCommands implements CommandHandler {
                     timeBit = "closed at " + fmt(p.getClosesAt());
                 } else {
                     var left = Duration.between(now, p.getClosesAt());
-                    timeBit = "closes in " + humanize(left);
+                    timeBit = "closes in " + PollTextBuilder.formatDuration(left);
                 }
 
                 sender.sendMessage(
@@ -316,16 +313,6 @@ public class AdminPollCommands implements CommandHandler {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
 
     private static String fmt(Instant t) { return TF.format(t); }
-
-    private static String humanize(Duration d) {
-        if (d.isNegative() || d.isZero()) return "now";
-        long s = d.getSeconds();
-        long dys = s / 86_400, hrs = (s % 86_400) / 3_600, mins = (s % 3_600) / 60;
-        if (dys > 0) return dys + "d " + hrs + "h";
-        if (hrs > 0) return hrs + "h " + mins + "m";
-        if (mins > 0) return mins + "m";
-        return (s % 60) + "s";
-    }
 
     private Component mm(String raw) {
         return Mini.parseMini(raw);

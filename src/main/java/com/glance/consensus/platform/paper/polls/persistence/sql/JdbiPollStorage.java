@@ -51,11 +51,6 @@ public class JdbiPollStorage implements PollStorage {
     }
 
     @Override
-    public CompletableFuture<Map<Integer, Integer>> loadTallies(@NotNull UUID pollId) {
-        return null;
-    }
-
-    @Override
     public CompletableFuture<Void> saveVoterSelection(@NotNull UUID pollId, @NotNull UUID voterId, @NotNull Set<Integer> indices) {
         return null;
     }

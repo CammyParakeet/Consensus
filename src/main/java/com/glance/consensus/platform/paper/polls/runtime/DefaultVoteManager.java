@@ -42,8 +42,6 @@ public class DefaultVoteManager implements VoteManager {
         final UUID pollId = poll.getId();
         final UUID playerId = player.getUniqueId();
 
-        log.warn("In Attempting vote for poll {}", poll.getPollIdentifier());
-
         // Serialize attempts per (poll, player)
         if (!acquireInFlight(pollId, playerId)) {
             return CompletableFuture.completedFuture(new VoteResult(
@@ -53,8 +51,6 @@ public class DefaultVoteManager implements VoteManager {
                     "<gray>Still saving your previous click...</gray>"
             ));
         }
-
-        log.warn("Acquired");
 
         // Fast validations
         if (poll.isClosed()) {
@@ -67,8 +63,6 @@ public class DefaultVoteManager implements VoteManager {
             ));
         }
 
-        log.warn("Not closed");
-
         if (optionIndex < 0 || optionIndex >= poll.getOptions().size()) {
             releaseInFlight(pollId, playerId);
             return CompletableFuture.completedFuture(new VoteResult(
@@ -79,14 +73,10 @@ public class DefaultVoteManager implements VoteManager {
             ));
         }
 
-        log.warn("Valid option {}", optionIndex);
-
         // Compute proposed selection based on rules
         final PollRules effective = RuleUtils.effectiveRules(player, poll.getRules());
         final Set<Integer> before = runtime.selectionSnapshot(playerId);
         final Set<Integer> proposed = computeNewSelectionSet(before, optionIndex, effective);
-
-        log.warn("Before {} | Proposed {}", before, proposed);
 
         // Resubmission policy (only applies if change is real)
         if (!effective.allowResubmissions() && !before.isEmpty() && !before.equals(proposed)) {
@@ -98,8 +88,6 @@ public class DefaultVoteManager implements VoteManager {
                     "<red>You already voted. Resubmissions are disabled</red>"
             ));
         }
-
-        log.warn("Allowed to vote");
 
         // Max selections
         if (effective.multipleChoice()) {
@@ -114,8 +102,6 @@ public class DefaultVoteManager implements VoteManager {
                 ));
             }
         }
-
-        log.warn("Hasn't maxxed selection");
 
         if (before.equals(proposed)) {
             releaseInFlight(pollId, playerId);
@@ -140,7 +126,6 @@ public class DefaultVoteManager implements VoteManager {
                         successMessage(effective, before, proposed)
                 ))
                 .exceptionally(ex -> {
-                    log.warn("FAILED TO SAVE VOTE: a", ex);
                     // Transactional Rollback optimistic change
                     runtime.applySelection(playerId, before);
                     return new VoteResult(

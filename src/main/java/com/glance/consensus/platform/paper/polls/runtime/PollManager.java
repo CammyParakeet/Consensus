@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -95,5 +96,10 @@ public interface PollManager extends Manager {
      * @return true if closed successfully, false if not found
      */
     boolean close(@NotNull UUID pollId);
+
+    /**
+     * Returns the set of unique voter UUIDs for a given poll
+     */
+    Set<UUID> findVoters(@NotNull UUID pollId);
 
 }

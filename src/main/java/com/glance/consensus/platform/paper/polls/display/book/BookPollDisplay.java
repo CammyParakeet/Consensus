@@ -29,6 +29,8 @@ import java.util.*;
 @Singleton
 public final class BookPollDisplay implements PollDisplay {
 
+    private final int MAX_RESULTS_BAR_LEN = 21;
+
     private final PollDisplayNavigator navigator;
 
     @Inject
@@ -63,7 +65,6 @@ public final class BookPollDisplay implements PollDisplay {
         final PollRules effective = RuleUtils.effectiveRules(player, runtime.getPoll().getRules());
 
         final boolean resultsOnly = shouldShowResultsOnly(player, runtime, effective);
-        log.warn("Should show ONLY results?? {}", resultsOnly);
         final ItemStack book = resultsOnly
                 ? buildResultsBook(player, runtime)
                 : buildVotingBook(player, runtime, effective);
@@ -115,16 +116,13 @@ public final class BookPollDisplay implements PollDisplay {
                 .setAuthor(Mini.parseMini(poll.getOwner().toString()));
 
         /* Handling Poll Question */
-        List<Component> page = new ArrayList<>(
-                PollTextBuilder.formatQuestion(
-                        poll,
-                        finalRules,
-                        PollTextBuilder.Options.bookVoting()));
+        List<Component> page = new ArrayList<>(PollTextBuilder.formatQuestion(
+                poll,
+                finalRules,
+                PollTextBuilder.Options.bookVoting())
+        );
 
-        // Gap
-        //page.add(Component.empty());
-
-        /* Handling Poll Answers */ // todo need effective rules?
+        /* Handling Poll Answers */
         page.addAll(PollTextBuilder.formatAnswers(
             poll,
             PollTextBuilder.Options.bookVoting(),
@@ -178,8 +176,8 @@ public final class BookPollDisplay implements PollDisplay {
         );
 
         int answerCount = options.size();
-        int missing = Math.max(0, 6 - answerCount);
-        int extraPad= (missing * 2) / 2;
+        int missing = Math.max(0, PollTextBuilder.TARGET_OPTIONS - answerCount);
+        int extraPad = (missing * PollTextBuilder.LINES_PER_OPTION_MISSING) / 2;
         for (int i = 0; i < extraPad; i++) page.add(Component.empty());
 
         for (var opt : options) {
@@ -210,23 +208,31 @@ public final class BookPollDisplay implements PollDisplay {
         int totalVotes,
         boolean selected
     ) {
-        int maxBar = 21;
         double pct = totalVotes == 0 ? 0.0 : (votes * 100.0) / totalVotes;
-        int barLength = (int) Math.round((pct / 100.0) * maxBar);
+        int barLength = (int) Math.round((pct / 100.0) * MAX_RESULTS_BAR_LEN);
 
         Component tooltip = (opt.tooltipRaw() != null) ? Mini.parseMini(opt.tooltipRaw()) : Component.empty();
 
         Component stats = Component.text()
-                .append(Mini.parseMini("<white><bold>" + opt.labelRaw() + "</bold></white>")).appendNewline()
                 .append(Mini.parseMini("<gray>[</gray>" + barBlock(barLength) + "<gray>]</gray> "))
                 .append(Mini.parseMini("<yellow>" + votes + "</yellow>"))
                 .append(Component.text(" "))
-                .append(Mini.parseMini("<gray>(" + String.format(Locale.ROOT, "%.1f", pct) + "%)</gray>")).appendNewline()
+                .append(Mini.parseMini("<gray>(" + String.format(Locale.ROOT, "%.1f", pct) + "%)</gray>"))
+                .appendNewline()
                 .append(Mini.parseMini("<gray>Your vote:</gray> " + (selected ? "<green>Yes</green>" : "<red>No</red>")))
                 .build();
 
-        if (ComponentUtils.isVisuallyEmpty(tooltip)) return stats;
-        return Component.text().append(stats).appendNewline().append(tooltip).build();
+        var hover = Component.text()
+                .append(Mini.parseMini("<white><bold>" + opt.labelRaw() + "</bold></white>"))
+                .append(Component.text("\n"));
+
+        if (!ComponentUtils.isVisuallyEmpty(tooltip)) {
+            hover.append(Component.text("\n")).append(tooltip).append(Component.text("\n"));
+        }
+
+        hover.append(Component.text("\n")).append(stats);
+
+        return hover.build();
     }
 
     private @NotNull String barBlock(int len) {

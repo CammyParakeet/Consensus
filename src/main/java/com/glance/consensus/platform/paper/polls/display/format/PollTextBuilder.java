@@ -17,17 +17,18 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.Function;
 
 @UtilityClass
 public class PollTextBuilder {
 
-    private final int TARGET_OPTIONS = 6;
-    private final int LINES_PER_OPTION_MISSING = 2;
+    public final int TARGET_OPTIONS = 6;
+    public final int LINES_PER_OPTION_MISSING = 2;
 
     @Data
     public final class Options {
@@ -102,28 +103,36 @@ public class PollTextBuilder {
         var parsed = center(poll.getQuestionRaw());
         Component line = parsed.value();
 
-        Component hover = Component.text()
-            .append(stateBadge)
-            .append(
-                parsed.truncated()
-                    ? Component.text("\n")
-                        .append(Mini.parseMini(poll.getQuestionRaw()))
-                    : Component.empty()
-            )
-            .append(
-                ComponentUtils.isVisuallyEmpty(selectionHint)
-                    ? Component.empty()
-                    : fullNewline().append(selectionHint)
-            )
-            .build();
+        Component hover = Component.empty();
+        hover = hover.append(stateBadge);
+
+        if (!poll.isClosed() && !options.preview) {
+            final Instant now = Instant.now();
+            final Instant closesAt = poll.getClosesAt();
+            if (now.isBefore(closesAt)) {
+                final Duration remaining = Duration.between(now, closesAt);
+                final String eta = formatDuration(remaining);
+                hover = hover.append(fullNewline())
+                    .append(Mini.parseMini("<gray>Closes in:</gray> <yellow>" + eta + "</yellow>"));
+            }
+        }
+
+        // If the title was truncated, add the full question on a new line
+        if (parsed.truncated()) {
+            hover = hover.append(fullNewline())
+                    .append(Mini.parseMini(poll.getQuestionRaw()));
+        }
+
+        // Only add the selection hint if present (no stray blank lines)
+        if (!ComponentUtils.isVisuallyEmpty(selectionHint)) {
+            hover = hover.append(fullNewline()).append(selectionHint);
+        }
 
         line = line.hoverEvent(hover);
-
         out.add(line);
         return out;
     }
 
-    // TODO: add click event to vote!!
     public List<Component> formatAnswers(
         @NotNull Poll poll,
         @NotNull Options options,
@@ -137,7 +146,7 @@ public class PollTextBuilder {
             // Center if we have missing answers
             int answerCount = poll.getOptions().size();
             int missing = Math.max(0, TARGET_OPTIONS - answerCount);
-            int extraPad = ((missing * LINES_PER_OPTION_MISSING) / 2) - 1;
+            int extraPad = ((missing * LINES_PER_OPTION_MISSING) / 2);
             for (int i = 0; i < extraPad; i++) answers.add(Component.empty());
         }
 
@@ -222,6 +231,23 @@ public class PollTextBuilder {
         }
 
         return Mini.parseMini(msg);
+    }
+
+    /** Simple duration formatter: 1h 23m (or 12m, 42s) */
+    public String formatDuration(Duration d) {
+        if (d.isNegative() || d.isZero()) return "now";
+        long seconds = d.getSeconds();
+
+        long days = seconds / 86_400; seconds %= 86_400;
+        long hours = seconds / 3_600; seconds %= 3_600;
+        long minutes = seconds / 60;  seconds %= 60;
+
+        StringBuilder sb = new StringBuilder();
+        if (days > 0) sb.append(days).append("d ");
+        if (hours > 0) sb.append(hours).append("h ");
+        if (minutes > 0) sb.append(minutes).append("m ");
+        if (sb.isEmpty()) sb.append(seconds).append("s");
+        return sb.toString().trim();
     }
 
     private Component fullNewline() {

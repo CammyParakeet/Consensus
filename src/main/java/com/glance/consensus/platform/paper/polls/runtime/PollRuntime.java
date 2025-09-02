@@ -90,37 +90,7 @@ public final class PollRuntime {
             @NotNull UUID voter,
             @NotNull Collection<Integer> indices
     ) {
-        log.warn("Poll: {} | Loading selection bootstrap for voter {} | indices {}",
-                poll.getPollIdentifier(), voter, indices);
-        //votes.put(voter, );
         applySelection(voter, Set.copyOf(new HashSet<>(indices)));
-    }
-
-    /**
-     * Recomputes tallies from the entire {@link #votes} map
-     */
-    public synchronized void recomputeTalliesFromSelections() {
-        final int optCount = poll.getOptions().size();
-        int[] counts = new int[optCount];
-        for (Set<Integer> s : votes.values()) {
-            for (int i : s) {
-                if (i >= 0 && i < optCount) counts[i]++; // bounds-guard for safety
-            }
-        }
-        writeTallies(counts);
-    }
-
-    /**
-     * Applies storage-authoritative tallies (e.g., from {@code PollStorage.loadTallies})
-     * <p>Does not modify per-voter selections; intended for periodic updates</p>
-     */
-    public synchronized void applyTallies(@NotNull Map<Integer, Integer> tallies) {
-        final int optCount = poll.getOptions().size();
-        int[] counts = new int[optCount];
-        tallies.forEach((idx, c) -> {
-            if (idx >= 0 && idx < optCount) counts[idx] = Math.max(0, c);
-        });
-        writeTallies(counts);
     }
 
     /** Marks this poll as closed */
@@ -133,7 +103,7 @@ public final class PollRuntime {
     /**
      * Incrementally updates tallies given a single voters transition
      */
-    private void applyTalliesDelta(
+    private synchronized void applyTalliesDelta(
             @NotNull Set<Integer> before,
             @NotNull Set<Integer> after
     ) {
@@ -151,7 +121,7 @@ public final class PollRuntime {
         writeTallies(counts);
     }
 
-    private void writeTallies(int[] counts) {
+    private synchronized void writeTallies(int[] counts) {
         final int optCount = poll.getOptions().size();
         for (int i = 0; i < optCount; i++) {
             var option = poll.getOptions().get(i);

@@ -328,30 +328,10 @@ public class FlatFilePollStorage implements PollStorage {
     private void saveVotesRaw(UUID pollId, Map<String, Set<Integer>> votes) {
         File f = votesFile(pollId);
         try (Writer w = Files.newBufferedWriter(f.toPath(), StandardCharsets.UTF_8)) {
-            log.warn("Writing into file {} votesMap {}", f.getPath(), votes);
             gson.toJson(votes, VOTES_MAP_TYPE, w);
         } catch (IOException e) {
-            log.error("FAIL IN SAVING VOTES ", e);
             throw new RuntimeException(e);
         }
-    }
-
-    private Map<Integer, Integer> computeTallies(Map<String, Set<Integer>> votesRaw) {
-        Map<Integer, Integer> t = new HashMap<>();
-        for (Set<Integer> sel : votesRaw.values()) {
-            for (int idx : sel) t.merge(idx, 1, Integer::sum);
-        }
-        return t;
-    }
-
-    @Override
-    public CompletableFuture<Map<Integer, Integer>> loadTallies(@NotNull UUID pollId) {
-        return CompletableFuture.supplyAsync(() -> {
-            synchronized (ioLock) {
-                Map<String, Set<Integer>> votes = loadVotesRaw(pollId);
-                return computeTallies(votes);
-            }
-        });
     }
 
     @Override
@@ -361,20 +341,16 @@ public class FlatFilePollStorage implements PollStorage {
         @NotNull Set<Integer> indices
     ) {
         final Set<Integer> clean = Set.copyOf(indices);
-        log.warn("About to be saving voter selection of {} for poll {}", indices, pollId);
 
         return CompletableFuture.runAsync(() -> {
            synchronized (ioLock) {
                Map<String, Set<Integer>> votes = loadVotesRaw(pollId);
-               log.warn("In save, loading existing {}", votes);
-
                if (clean.isEmpty()) {
                    // treat empty set as delete
                    votes.remove(voterId.toString());
                } else {
                    votes.put(voterId.toString(), new HashSet<>(clean));
                }
-               log.warn("About to save to file {}", votes);
                saveVotesRaw(pollId, votes);
            }
         });

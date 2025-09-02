@@ -2,10 +2,13 @@ package com.glance.consensus.platform.paper.commands.impl.core;
 
 import com.glance.consensus.platform.paper.commands.engine.CommandHandler;
 import com.glance.consensus.platform.paper.polls.display.PollDisplayNavigator;
+import com.glance.consensus.platform.paper.polls.display.format.PollTextBuilder;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
+import com.glance.consensus.platform.paper.polls.domain.PollRules;
 import com.glance.consensus.platform.paper.polls.persistence.PollStorage;
 import com.glance.consensus.platform.paper.polls.runtime.PollManager;
 import com.glance.consensus.platform.paper.polls.runtime.PollRuntime;
+import com.glance.consensus.platform.paper.polls.utils.RuleUtils;
 import com.glance.consensus.platform.paper.utils.Mini;
 import com.google.auto.service.AutoService;
 import com.google.inject.Inject;
@@ -98,7 +101,6 @@ public class AdminPollCommands implements CommandHandler {
 
     // todo use list option for suggestions
     @Command("poll open <id>")
-    @Permission("consensus.polls.open")
     public void openPoll(
         @NotNull Player player,
         @NotNull @Argument(value = "id", suggestions = "pollIds") String id
@@ -120,8 +122,51 @@ public class AdminPollCommands implements CommandHandler {
        this.displayNavigator.openVoting(player, rtOpt.get());
     }
 
+    @Command("poll results <id>")
+    public void openResults(
+            @NotNull Player player,
+            @NotNull @Argument(value = "id", suggestions = "pollIds") String id
+    ) {
+        var targetId = resolvePollId(id);
+        if (targetId.isEmpty()) {
+            player.sendMessage(mm("<red>Unknown poll id:</red> <gray>" + id + "</gray>"));
+            return;
+        }
+
+        var rtOpt = manager.get(targetId.get());
+        if (rtOpt.isEmpty()) {
+            player.sendMessage(mm("<red>No in-memory runtime for poll:</red> <gray>" +
+                targetId.get() + "</gray>"));
+            return;
+        }
+
+        PollRuntime rt = rtOpt.get();
+        Poll poll = rt.getPoll();
+        PollRules effective = RuleUtils.effectiveRules(player, poll.getRules());
+
+        // Allowed paths:
+        //  - player is allowed to view results (rule)
+        //  - or the poll is already closed (always viewable)
+        if (effective.canViewResults() || poll.isClosed()) {
+            this.displayNavigator.openResults(player, rt);
+            return;
+        }
+
+        // Denied: poll is still open AND results are hidden until close
+        Instant now = Instant.now();
+        Instant closesAt = poll.getClosesAt();
+        String eta = now.isBefore(closesAt)
+            ? PollTextBuilder.formatDuration(Duration.between(now, closesAt))
+            : "soon";
+
+        player.sendMessage(mm(
+            "<red>You can’t view results yet.</red> <gray>This poll hides results until it closes.</gray>\n" +
+                    "<gray>Closes in:</gray> <yellow>" + eta + "</yellow>"
+        ));
+    }
+
     @Command("poll close <id>")
-    @Permission("consemsus.polls.close")
+    @Permission("consensus.polls.close")
     public void closePoll(
         @NotNull CommandSender sender,
         @NotNull @Argument(value = "id", suggestions = "pollIds") String id
@@ -131,10 +176,8 @@ public class AdminPollCommands implements CommandHandler {
             sender.sendMessage("Unknown poll id: " + id);
             return;
         }
-
         this.manager.close(targetId.get());
     }
-
 
     @Command("poll delete <id>")
     @Permission("consensus.polls.delete")

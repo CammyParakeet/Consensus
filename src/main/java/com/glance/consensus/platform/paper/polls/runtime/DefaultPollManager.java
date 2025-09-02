@@ -8,12 +8,15 @@ import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.domain.PollOption;
 import com.glance.consensus.platform.paper.polls.domain.PollRules;
 import com.glance.consensus.platform.paper.polls.persistence.PollStorage;
+import com.glance.consensus.platform.paper.utils.Mini;
 import com.glance.consensus.utils.StringUtils;
 import com.google.auto.service.AutoService;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
+import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
@@ -146,10 +149,9 @@ public final class DefaultPollManager implements PollManager {
         return polls.values().stream().filter(p -> !p.getPoll().isClosed()).toList();
     }
 
+    @Deprecated
     @Override
-    public void markVoted(@NotNull UUID pollId, @NotNull UUID voterId) {
-
-    }
+    public void markVoted(@NotNull UUID pollId, @NotNull UUID voterId) {}
 
     @Override
     public boolean close(@NotNull UUID pollId) {
@@ -158,18 +160,44 @@ public final class DefaultPollManager implements PollManager {
         return safeClose(runtime.getPoll(), Instant.now());
     }
 
-    private boolean safeClose(@NotNull Poll poll, Instant closeTime) {
-        storageProvider.get().closePoll(poll.getId(), closeTime)
-                .thenRun(() -> {
-                    // TODO
-                })
-                .exceptionally(ex -> {
-                    plugin.getLogger().severe("Failed to persist poll close for: " +
-                            poll.getPollIdentifier());
-                    return null;
-                });
+    @Override
+    public Set<UUID> findVoters(@NotNull UUID pollId) {
+        var opt = get(pollId);
+        return opt.isEmpty() ? Set.of() : opt.get().votersSnapshot();
+    }
 
-        var runtime = polls.get(poll.getId());
+    private boolean safeClose(@NotNull Poll poll, Instant closeTime) {
+        UUID pollId = poll.getId();
+        storageProvider.get().closePoll(pollId, closeTime)
+            .thenRun(() -> {
+                Set<UUID> voters = findVoters(pollId);
+                if (voters.isEmpty()) return;
+
+                Component msg = Mini.parseMini(
+                    "<newline>" +
+                    "<gray>Poll:<b><newline><white>\"</white>" + poll.getQuestionRaw() +
+                    "<white>\"</white><newline></b>Has now <red><u>closed</u></red></gray><newline>" +
+                    "<hover:show_text:'<green>Click to view results</green>'>" +
+                    "<click:run_command:'/poll results " + poll.getPollIdentifier() + "'>" +
+                    "<aqua>[View Results]</aqua>" +
+                    "</click></hover>" +
+                    "<newline>"
+                );
+
+                for (UUID voterId : voters) {
+                    Player p = Bukkit.getPlayer(voterId);
+                    if (p != null && p.isOnline()) {
+                        p.sendMessage(msg);
+                    }
+                }
+            })
+            .exceptionally(ex -> {
+                plugin.getLogger().severe("Failed to persist poll close for: " +
+                        poll.getPollIdentifier());
+                return null;
+            });
+
+        var runtime = polls.get(pollId);
         if (runtime == null) return false;
         runtime.close();
         return true;
@@ -187,14 +215,11 @@ public final class DefaultPollManager implements PollManager {
         storage.loadRecentPolls(CLOSED_RETENTION).thenAccept(list -> {
             if (list == null) return;
 
-            log.warn("Loaded {} recent poll files", list.size());
-
             List<CompletableFuture<Void>> voteLoadFutures = new ArrayList<>(list.size());
 
             for (Poll p : list) {
                 var future = storage.loadAllSelections(p.getId())
                     .thenAccept(selections -> {
-                        log.warn("Poll File {} loaded selections {}", p.getPollIdentifier(), selections);
                         PollRuntime rt = polls.computeIfAbsent(p.getId(), __ -> new PollRuntime(p));
                         selections.forEach(rt::supplySelectionBootstrap);
                     })

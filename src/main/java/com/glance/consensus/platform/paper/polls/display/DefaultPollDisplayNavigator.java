@@ -62,9 +62,7 @@ public class DefaultPollDisplayNavigator implements PollDisplayNavigator {
         @NotNull PollRuntime runtime,
         int optionIndex
     ) {
-        log.warn("About to handle a vote click for {} option {}", player.getName(), optionIndex);
         voteManager.attemptVote(player, runtime, optionIndex).thenAccept(result -> {
-            log.warn("Vote result was {}", result);
             if (result.userMsg() != null && !result.userMsg().isBlank()) {
                 player.sendMessage(Mini.parseMini(result.userMsg()));
             }

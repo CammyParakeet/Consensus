@@ -91,27 +91,6 @@ public interface PollStorage {
     /* Voter Specific */
 
     /**
-     * Computes the total number of votes for each option in a poll
-     *
-     * <p>A <em>tally</em> is the aggregated vote count for an option, derived by scanning
-     * every persisted voter selection for the poll. For example, if three voters each
-     * selected option index {@code 2}, then the tally map will contain {@code 2 -> 3}.
-     * </p>
-     *
-     * <p>This method must always reflect the state in storage
-     * <p>
-     * Implementations must not depend on in-memory counts maintained by {@link PollRuntime},
-     * because those only exist while the server is running. Recomputing from persisted
-     * selections ensures that results are correct after restarts or if memory and storage
-     * ever drift</p>
-     *
-     * @param pollId the poll to count votes for
-     * @return future completing with a map of {@code optionIndex -> voteCount}
-     *         Missing keys imply zero votes for that option
-     */
-    CompletableFuture<Map<Integer, Integer>> loadTallies(@NotNull UUID pollId);
-
-    /**
      * Persists (creates or replaces) the full selection set for a single voter
      *
      * <p>Selections are stored atomically per (poll, voter). Any existing selection
@@ -140,10 +119,12 @@ public interface PollStorage {
      * @param voterId voter whose selection should be removed
      * @return future completing when the removal has been durably written
      */
-    CompletableFuture<Void> deleteVoterSelection(
+    default CompletableFuture<Void> deleteVoterSelection(
         @NotNull UUID pollId,
         @NotNull UUID voterId
-    );
+    ) {
+        return null;
+    }
 
     /**
      * Loads the stored selection set for a single voter in a poll
@@ -155,10 +136,12 @@ public interface PollStorage {
      * @param voterId voter whose selection should be loaded
      * @return future completing with the set of chosen option indices (possibly empty)
      */
-    CompletableFuture<Set<Integer>> loadVoterSelection(
+    default CompletableFuture<Set<Integer>> loadVoterSelection(
         @NotNull UUID pollId,
         @NotNull UUID voterId
-    );
+    ) {
+        return null;
+    }
 
     /**
      * Loads all voters who currently have a stored selection for the given poll
@@ -169,7 +152,9 @@ public interface PollStorage {
      * @param pollId poll id
      * @return future completing with the set of voter UUIDs
      */
-    CompletableFuture<Set<UUID>> loadVoters(@NotNull UUID pollId);
+     default CompletableFuture<Set<UUID>> loadVoters(@NotNull UUID pollId) {
+         return null;
+     }
 
     /**
      * Loads the complete set of stored selections for a poll

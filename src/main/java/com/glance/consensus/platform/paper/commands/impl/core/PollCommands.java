@@ -6,6 +6,7 @@ import com.glance.consensus.platform.paper.polls.display.format.PollTextBuilder;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.domain.PollListOption;
 import com.glance.consensus.platform.paper.polls.domain.PollRules;
+import com.glance.consensus.platform.paper.polls.menu.PollsMenu;
 import com.glance.consensus.platform.paper.polls.persistence.PollStorage;
 import com.glance.consensus.platform.paper.polls.runtime.PollManager;
 import com.glance.consensus.platform.paper.polls.runtime.PollRuntime;
@@ -35,21 +36,24 @@ import java.util.stream.Collectors;
 
 @Singleton
 @AutoService(CommandHandler.class)
-public class AdminPollCommands implements CommandHandler {
+public class PollCommands implements CommandHandler {
 
     private final PollManager manager;
     private final PollStorage storage;
     private final PollDisplayNavigator displayNavigator;
+    private final PollsMenu pollsMenu;
 
     @Inject
-    public AdminPollCommands(
+    public PollCommands(
         @NotNull PollManager manager,
         @NotNull PollStorage storage,
-        @NotNull PollDisplayNavigator displayNavigator
+        @NotNull PollDisplayNavigator displayNavigator,
+        @NotNull PollsMenu pollsMenu
     ) {
         this.manager = manager;
         this.storage = storage;
         this.displayNavigator = displayNavigator;
+        this.pollsMenu = pollsMenu;
     }
 
     @Suggestions("pollIds")
@@ -85,6 +89,13 @@ public class AdminPollCommands implements CommandHandler {
         return ids.stream()
             .filter(s -> s.toLowerCase(Locale.ROOT).startsWith(prefix))
             .toList();
+    }
+
+    @Command("polls")
+    public void pollMenu(
+        @NotNull Player player
+    ) {
+        this.pollsMenu.open(player);
     }
 
     @Command("poll create [id]")

@@ -10,7 +10,9 @@ import com.glance.consensus.platform.paper.polls.display.book.BookPollDisplay;
 import com.glance.consensus.platform.paper.polls.persistence.PollStorage;
 import com.glance.consensus.platform.paper.polls.persistence.config.PollStorageProvider;
 import com.glance.consensus.platform.paper.polls.runtime.DefaultPollManager;
+import com.glance.consensus.platform.paper.polls.runtime.DefaultVoteManager;
 import com.glance.consensus.platform.paper.polls.runtime.PollManager;
+import com.glance.consensus.platform.paper.polls.runtime.VoteManager;
 import com.google.inject.AbstractModule;
 import com.google.inject.Singleton;
 import com.google.inject.multibindings.MapBinder;
@@ -38,12 +40,13 @@ public final class ConsensusModule extends AbstractModule {
         this.bind(PollManager.class).to(DefaultPollManager.class).asEagerSingleton();
 
         install(new PollBuilderWizardModule(plugin));
+        this.bind(PollDisplayNavigator.class).to(DefaultPollDisplayNavigator.class).asEagerSingleton();
+
+        this.bind(VoteManager.class).to(DefaultVoteManager.class).asEagerSingleton();
 
         MapBinder<PollDisplay.Mode, PollDisplay> displayBinder =
                 MapBinder.newMapBinder(binder(), PollDisplay.Mode.class, PollDisplay.class);
 
         displayBinder.addBinding(PollDisplay.Mode.BOOK).to(BookPollDisplay.class).asEagerSingleton();
-
-        this.bind(PollDisplayNavigator.class).to(DefaultPollDisplayNavigator.class).asEagerSingleton();
     }
 }

@@ -1,9 +1,9 @@
 package com.glance.consensus.platform.paper.polls.runtime;
 
 import com.glance.consensus.platform.paper.polls.domain.VoteResult;
+import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -21,11 +21,9 @@ public interface VoteManager {
      * @return a result describing outcome and recommended UI action
      */
     CompletableFuture<VoteResult> attemptVote(
-        @NotNull UUID pollId,
-        @NotNull UUID voterId,
+        @NotNull Player player,
+        @NotNull PollRuntime runtime,
         int optionIndex
     );
-
-
 
 }

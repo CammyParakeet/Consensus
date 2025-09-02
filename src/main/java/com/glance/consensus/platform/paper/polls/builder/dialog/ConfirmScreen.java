@@ -4,8 +4,7 @@ import com.glance.consensus.platform.paper.polls.builder.PollBuildNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildScreen;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildSession;
 import com.glance.consensus.platform.paper.polls.display.book.builder.BookUtils;
-import com.glance.consensus.platform.paper.polls.display.format.AlignmentUtils;
-import com.glance.consensus.platform.paper.polls.display.format.PollTextFormatter;
+import com.glance.consensus.platform.paper.polls.display.format.PollTextBuilder;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.domain.PollOption;
 import com.glance.consensus.platform.paper.polls.domain.PollRules;
@@ -81,13 +80,13 @@ public final class ConfirmScreen implements PollBuildScreen {
         }
 
         PollRules rules = poll.getRules();
-        var formatOpt = PollTextFormatter.Options.preview();
+        var formatOpt = PollTextBuilder.Options.preview();
 
         List<Component> preview = new ArrayList<>();
         preview.add(emptyLine());
-        preview.addAll(PollTextFormatter.formatQuestion(poll, rules, formatOpt));
+        preview.addAll(PollTextBuilder.formatQuestion(poll, rules, formatOpt));
         preview.add(emptyLine());
-        preview.addAll(PollTextFormatter.formatAnswers(poll, formatOpt, Set.of()));
+        preview.addAll(PollTextBuilder.formatAnswers(poll, formatOpt, null, Set.of(), null));
         preview.add(emptyLine());
 
         List<DialogBody> previewBodies = new ArrayList<>();

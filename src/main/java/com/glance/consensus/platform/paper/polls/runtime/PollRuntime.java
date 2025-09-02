@@ -3,37 +3,38 @@ package com.glance.consensus.platform.paper.polls.runtime;
 import com.glance.consensus.platform.paper.polls.display.PollDisplay;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.domain.PollOption;
-import com.glance.consensus.platform.paper.polls.domain.PollRules;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Runtime wrapper around a {@link Poll}, handling live votes and tallies
- * <p>
- * Stores per-voter selections, enforces {@link PollRules}, and updates
- * {@link PollOption} vote counts in-place on each vote
+ * Runtime wrapper around a {@link Poll} that stores live per-voter selections
+ * and maintains tallies for fast UI reads
  * <p>
  * Thread-safe: vote and close operations are synchronized
  *
  * @author Cammy
  */
+@Slf4j
 @RequiredArgsConstructor
 public final class PollRuntime {
 
-    /** The backing poll definition (mutable vote counts, closed flag) */
+    /** Backing poll definition (mutable option vote counts, closed flag) */
     @Getter
     private final Poll poll;
 
-    // todo a future impl could have more display modes
+    /** Display mode in use (kept for your current architecture) */
     @Getter
     private final PollDisplay.Mode mode = PollDisplay.Mode.BOOK;
 
-    // voterId -> indices chosen
+    /** voterId -> indices chosen (complete set per voter) */
     private final Map<UUID, Set<Integer>> votes = new ConcurrentHashMap<>();
+
+    /* ------------ Snapshots ------------ */
 
     public synchronized boolean hasVoted(@NotNull UUID voter) {
         var s = votes.get(voter);
@@ -49,73 +50,119 @@ public final class PollRuntime {
         return (s == null) ? Set.of() : Set.copyOf(s);
     }
 
-    public synchronized void supplyVotes(
-        @NotNull UUID voter,
-        @NotNull Collection<Integer> indices
-    ) {
-        if (indices.isEmpty()) return;
-        votes.put(voter, new HashSet<>(indices));
-
-        recomputeTallies();
-    }
+    /* ------------ Mutations owned by VoteManager ------------ */
 
     /**
-     * Records a vote for the given voter
+     * Applies (or clears) the full selection set for a voter and updates tallies.
+     * <p>
+     * This method does <b>not</b> enforce any rules—callers must ensure validity.
      *
      * @param voter voter id
-     * @param voteIndices indices of selected options
-     * @return true if vote accepted, false if rejected by validation/rules
+     * @param newSelection new selection set; empty to clear
+     * @return true if state changed; false if no change
      */
-    public synchronized boolean vote(
-        @NotNull UUID voter,
-        Collection<Integer> voteIndices
+    public synchronized boolean applySelection(
+            @NotNull UUID voter,
+            @NotNull Set<Integer> newSelection
     ) {
-        if (poll.isClosed()) return false;
-        if (voteIndices.isEmpty()) return false;
+        final Set<Integer> before = votes.getOrDefault(voter, Set.of());
+        if (before.equals(newSelection)) return false;
 
-        var optCount = poll.getOptions().size();
-        // validate votes
-        for (int i : voteIndices) if (i < 0 || i >= optCount) return false;
+        // Copy to stable sets for delta calc
+        final Set<Integer> beforeCopy = new HashSet<>(before);
+        final Set<Integer> afterCopy  = new HashSet<>(newSelection);
 
-        var rules = poll.getRules();
-        if (!rules.multipleChoice()) {
-            int chosen = voteIndices.iterator().next();
-            Set<Integer> existing = votes.get(voter);
-            if (existing != null && !existing.isEmpty()) {
-                if (!rules.allowResubmissions()) return false;
-                existing.clear();
-                existing.add(chosen);
-            } else {
-                votes.put(voter, new HashSet<>(Set.of(chosen)));
-            }
+        if (afterCopy.isEmpty()) {
+            votes.remove(voter);
         } else {
-            if (voteIndices.size() > rules.maxSelections()) return false;
-            Set<Integer> set = new HashSet<>(voteIndices);
-            if (set.size() != voteIndices.size()) return false;
-            votes.put(voter, set);
+            // store a defensive copy
+            votes.put(voter, Set.copyOf(afterCopy));
         }
 
-        recomputeTallies();
+        applyTalliesDelta(beforeCopy, afterCopy);
         return true;
     }
 
-    private void recomputeTallies() {
-        final int optCount = poll.getOptions().size();
-        int[] counts = new int[optCount];
-        for (Set<Integer> s : votes.values()) for (int i : s) counts[i]++;
-
-        for (int i = 0; i < optCount; i++) {
-            var option = poll.getOptions().get(i);
-            poll.getOptions().set(i, new PollOption(
-                    option.index(), option.labelRaw(), option.tooltipRaw(), counts[i]));
-        }
+    /**
+     * Seeds runtime with previously persisted selections for a voter
+     */
+    public synchronized void supplySelectionBootstrap(
+            @NotNull UUID voter,
+            @NotNull Collection<Integer> indices
+    ) {
+        log.warn("Poll: {} | Loading selection bootstrap for voter {} | indices {}",
+                poll.getPollIdentifier(), voter, indices);
+        //votes.put(voter, );
+        applySelection(voter, Set.copyOf(new HashSet<>(indices)));
     }
 
     /**
-     * Marks this poll as closed, preventing new votes
+     * Recomputes tallies from the entire {@link #votes} map
      */
+    public synchronized void recomputeTalliesFromSelections() {
+        final int optCount = poll.getOptions().size();
+        int[] counts = new int[optCount];
+        for (Set<Integer> s : votes.values()) {
+            for (int i : s) {
+                if (i >= 0 && i < optCount) counts[i]++; // bounds-guard for safety
+            }
+        }
+        writeTallies(counts);
+    }
+
+    /**
+     * Applies storage-authoritative tallies (e.g., from {@code PollStorage.loadTallies})
+     * <p>Does not modify per-voter selections; intended for periodic updates</p>
+     */
+    public synchronized void applyTallies(@NotNull Map<Integer, Integer> tallies) {
+        final int optCount = poll.getOptions().size();
+        int[] counts = new int[optCount];
+        tallies.forEach((idx, c) -> {
+            if (idx >= 0 && idx < optCount) counts[idx] = Math.max(0, c);
+        });
+        writeTallies(counts);
+    }
+
+    /** Marks this poll as closed */
     public synchronized void close() {
         poll.setClosed(true);
+    }
+
+    /* ------------ Internals ------------ */
+
+    /**
+     * Incrementally updates tallies given a single voters transition
+     */
+    private void applyTalliesDelta(
+            @NotNull Set<Integer> before,
+            @NotNull Set<Integer> after
+    ) {
+        if (before.equals(after)) return;
+
+        final int optCount = poll.getOptions().size();
+        // Build a working array from current PollOption votes
+        int[] counts = new int[optCount];
+        for (int i = 0; i < optCount; i++) counts[i] = poll.getOptions().get(i).votes();
+
+        // Compute delta: remove vanished, add new
+        for (int i : before) if (!after.contains(i) && inBounds(i, optCount)) counts[i] = Math.max(0, counts[i] - 1);
+        for (int i : after)  if (!before.contains(i) && inBounds(i, optCount)) counts[i] = counts[i] + 1;
+
+        writeTallies(counts);
+    }
+
+    private void writeTallies(int[] counts) {
+        final int optCount = poll.getOptions().size();
+        for (int i = 0; i < optCount; i++) {
+            var option = poll.getOptions().get(i);
+            poll.getOptions().set(i, new PollOption(
+                    option.index(), option.labelRaw(), option.tooltipRaw(), counts[i]
+            ));
+        }
+    }
+
+    private static boolean inBounds(int idx, int size) {
+        return idx >= 0 && idx < size;
     }
 
 }

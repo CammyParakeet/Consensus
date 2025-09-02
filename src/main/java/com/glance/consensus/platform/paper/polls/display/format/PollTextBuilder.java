@@ -1,13 +1,17 @@
 package com.glance.consensus.platform.paper.polls.display.format;
 
+import com.glance.consensus.platform.paper.polls.display.PollDisplayNavigator;
 import com.glance.consensus.platform.paper.polls.display.book.builder.BookUtils;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.domain.PollRules;
+import com.glance.consensus.platform.paper.polls.utils.RuleUtils;
 import com.glance.consensus.platform.paper.utils.ComponentUtils;
 import com.glance.consensus.platform.paper.utils.Mini;
 import lombok.Data;
 import lombok.experimental.UtilityClass;
+import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickCallback;
 import net.kyori.adventure.text.event.ClickEvent;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -16,9 +20,11 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 @UtilityClass
-public class PollTextFormatter {
+public class PollTextBuilder {
 
     private final int TARGET_OPTIONS = 6;
     private final int LINES_PER_OPTION_MISSING = 2;
@@ -26,75 +32,104 @@ public class PollTextFormatter {
     @Data
     public final class Options {
         private final boolean preview;
+        private final boolean results;
         private final int targetOptions;
         private final int linesPerOptionMissing;
         private final boolean includeRulesHover;
+        private final boolean addVoteClick;
         private final VoteBadgeUtils.VoteStyle voteStyle;
         private final VoteBadgeUtils.Theme theme;
 
         public static Options preview() {
             return new Options(
                     true,
+                    false,
                     TARGET_OPTIONS,
                     LINES_PER_OPTION_MISSING,
+                    true,
+                    false,
+                    VoteBadgeUtils.VoteStyle.CHECKBOX,
+                    VoteBadgeUtils.Theme.defaultVote());
+        }
+
+        public static Options bookVoting() {
+            return new Options(
+                    false,
+                    false,
+                    TARGET_OPTIONS,
+                    LINES_PER_OPTION_MISSING,
+                    false,
                     true,
                     VoteBadgeUtils.VoteStyle.CHECKBOX,
                     VoteBadgeUtils.Theme.defaultVote());
         }
 
-        public static Options voting() {
+        public static Options bookResults() {
             return new Options(
                     false,
+                    true,
                     TARGET_OPTIONS,
                     LINES_PER_OPTION_MISSING,
                     false,
+                    false,
                     VoteBadgeUtils.VoteStyle.CHECKBOX,
-                    VoteBadgeUtils.Theme.defaultVote());
+                    VoteBadgeUtils.Theme.defaultResults());
         }
     }
 
-    // TODO: add hover and click to poll info??
     public List<Component> formatQuestion(
             @NotNull Poll poll,
             @NotNull PollRules finalRules,
             @NotNull Options options
     ) {
-        List<Component> question = new ArrayList<>();
-        Component questionTooltip = Component.empty();
+        List<Component> out = new ArrayList<>();
 
-        if (!options.preview) {
-            String amountMsg = (finalRules.multipleChoice() && finalRules.maxSelections() > 1)
-                    ? "one or multiple answers" : "one answer";
-            questionTooltip = Mini.parseMini("<dark_gray>Select " + amountMsg + " to vote for");
-        }
+        final String stateLabel = poll.isClosed() ? "Closed" : "Open";
+        final Component stateBadge = Mini.parseMini(
+                VoteBadgeUtils.buildBadge(stateLabel, !poll.isClosed(), VoteBadgeUtils.Theme.defaultActivity())
+        );
 
-        var questionParsed = center(poll.getQuestionRaw());
-        Component questionComp;
-        if (questionParsed.truncated()) {
-            final Component fullQuestion = Mini.parseMini(poll.getQuestionRaw());
-            final Component hover;
-
-            if (ComponentUtils.isVisuallyEmpty(questionTooltip)) {
-                hover = fullQuestion;
-            } else {
-                hover = Component.text().append(fullQuestion, fullNewline(), questionTooltip).build();
-            }
-
-            questionComp = questionParsed.value().hoverEvent(hover);
+        final boolean showHint = options.includeRulesHover && !options.preview && !options.results;
+        final Component selectionHint;
+        if (showHint) {
+            final boolean multi = finalRules.multipleChoice() && finalRules.maxSelections() > 1;
+            final String amountMsg = multi ? "one or multiple answers" : "one answer";
+            selectionHint = Mini.parseMini("<gray>Select " + amountMsg + " to vote for</gray>");
         } else {
-            questionComp = questionParsed.value();
+            selectionHint = Component.empty();
         }
 
-        question.add(questionComp);
+        var parsed = center(poll.getQuestionRaw());
+        Component line = parsed.value();
 
-        return question;
+        Component hover = Component.text()
+            .append(stateBadge)
+            .append(
+                parsed.truncated()
+                    ? Component.text("\n")
+                        .append(Mini.parseMini(poll.getQuestionRaw()))
+                    : Component.empty()
+            )
+            .append(
+                ComponentUtils.isVisuallyEmpty(selectionHint)
+                    ? Component.empty()
+                    : fullNewline().append(selectionHint)
+            )
+            .build();
+
+        line = line.hoverEvent(hover);
+
+        out.add(line);
+        return out;
     }
 
     // TODO: add click event to vote!!
     public List<Component> formatAnswers(
-            @NotNull Poll poll,
-            @NotNull Options options,
-            @Nullable Set<Integer> viewerVotes
+        @NotNull Poll poll,
+        @NotNull Options options,
+        @Nullable Player player,
+        @Nullable Set<Integer> viewerVotes,
+        @Nullable BiConsumer<Audience, Integer> onClick
     ) {
         List<Component> answers = new ArrayList<>();
 
@@ -132,19 +167,25 @@ public class PollTextFormatter {
                 hoverComp = tooltip;
             }
 
-            final Component actionHint = options.preview ? Component.empty() : buildActionHint(poll, selected);
-            final Component fullHoverComp = ComponentUtils.isVisuallyEmpty(hoverComp) ? actionHint
-                    : Component.text().append(hoverComp, fullNewline(), actionHint).build();
+            final Component actionHint = options.preview ? Component.empty() : buildActionHint(poll, player, selected);
+            final Component fullHoverComp;
+            if (ComponentUtils.isVisuallyEmpty(actionHint)) {
+                fullHoverComp = hoverComp;
+            } else if (ComponentUtils.isVisuallyEmpty(hoverComp)) {
+                fullHoverComp = actionHint;
+            } else {
+                fullHoverComp = Component.text()
+                        .append(hoverComp, fullNewline(), actionHint)
+                        .build();
+            }
 
             Component line = answerParsed.value().hoverEvent(fullHoverComp);
 
-            if (!options.preview) {
-                line = line.clickEvent(ClickEvent.callback(a -> {
-                    if (!(a instanceof Player p)) return;
-
-                    p.sendMessage("You voted for " + poll.getPollIdentifier());
-
-                    // TODO actual vote
+            if (options.addVoteClick && onClick != null) {
+                line = line.clickEvent(ClickEvent.callback((Audience a) -> {
+                    try {
+                        onClick.accept(a, idx);
+                    } catch (Throwable ignored) {}
                 }));
             }
 
@@ -155,9 +196,13 @@ public class PollTextFormatter {
         return answers;
     }
 
-    private Component buildActionHint(@NotNull Poll poll, boolean selected) {
-        var rules = poll.getRules();
-        final String msg;
+    private Component buildActionHint(
+        @NotNull Poll poll,
+        @Nullable Player player,
+        boolean selected
+    ) {
+        var rules = RuleUtils.effectiveRules(player, poll.getRules());
+        String msg;
         if (selected) {
             if (!rules.allowResubmissions()) {
                 msg = "<gray>You've voted for this option";
@@ -170,6 +215,10 @@ public class PollTextFormatter {
             msg = rules.multipleChoice()
                     ? "<green>Click to select"
                     : "<green>Click to vote";
+        }
+
+        if (rules.canViewResults()) {
+            msg += "\n<dark_gray>Turn the page to view results";
         }
 
         return Mini.parseMini(msg);

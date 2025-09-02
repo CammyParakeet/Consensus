@@ -159,8 +159,7 @@ public final class DefaultPollManager implements PollManager {
     }
 
     private boolean safeClose(@NotNull Poll poll, Instant closeTime) {
-        UUID id = poll.getId();
-        storageProvider.get().closePoll(id, closeTime)
+        storageProvider.get().closePoll(poll.getId(), closeTime)
                 .thenRun(() -> {
                     // TODO
                 })
@@ -170,7 +169,7 @@ public final class DefaultPollManager implements PollManager {
                     return null;
                 });
 
-        var runtime = polls.get(id);
+        var runtime = polls.get(poll.getId());
         if (runtime == null) return false;
         runtime.close();
         return true;
@@ -187,13 +186,17 @@ public final class DefaultPollManager implements PollManager {
 
         storage.loadRecentPolls(CLOSED_RETENTION).thenAccept(list -> {
             if (list == null) return;
+
+            log.warn("Loaded {} recent poll files", list.size());
+
             List<CompletableFuture<Void>> voteLoadFutures = new ArrayList<>(list.size());
 
             for (Poll p : list) {
                 var future = storage.loadAllSelections(p.getId())
                     .thenAccept(selections -> {
+                        log.warn("Poll File {} loaded selections {}", p.getPollIdentifier(), selections);
                         PollRuntime rt = polls.computeIfAbsent(p.getId(), __ -> new PollRuntime(p));
-                        selections.forEach(rt::supplyVotes);
+                        selections.forEach(rt::supplySelectionBootstrap);
                     })
                     .exceptionally(ex -> {
                         plugin.getLogger().warning("Failed to reload/supply vote selections for poll " +

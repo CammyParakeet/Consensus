@@ -28,9 +28,17 @@ public class VoteBadgeUtils {
         public static Theme defaultVote() {
             return new Theme(
                     NamedTextColor.GREEN,
-                    NamedTextColor.WHITE,
+                    NamedTextColor.DARK_GREEN,
                     NamedTextColor.DARK_GRAY,
                     NamedTextColor.GRAY
+            );
+        }
+        public static Theme defaultActivity() {
+            return new Theme(
+                    NamedTextColor.AQUA,
+                    NamedTextColor.GREEN,
+                    NamedTextColor.DARK_GRAY,
+                    NamedTextColor.RED
             );
         }
     }
@@ -41,7 +49,7 @@ public class VoteBadgeUtils {
         @NotNull Theme theme
     ) {
         final String inner = switch (style) {
-            case CHECKBOX -> selected ? "✓" : " ";
+            case CHECKBOX -> selected ? "✔" : " ";
             case DOT -> selected ? "•" : "·";
             case XMARK -> selected ? "x" : " ";
         };

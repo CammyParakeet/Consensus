@@ -35,11 +35,11 @@ public interface PollDisplay {
     }
 
     enum RefreshCause {
-        INITIAL_OPEN,
-        VOTE_ACCEPTED,
-        VOTE_REJECTED,
+        SELECTION_CHANGED,
+        RULES_REJECTED,
         POLL_CLOSED,
-        EXTERNAL
+        STORAGE_ERROR,
+        MANUAL
     }
 
 }

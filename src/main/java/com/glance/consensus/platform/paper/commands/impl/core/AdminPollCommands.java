@@ -148,8 +148,13 @@ public class AdminPollCommands implements CommandHandler {
             return;
         }
 
-        this.storage.deletePoll(targetId.get()).thenRun(() ->
-            sender.sendMessage("Deleted poll " + id));
+        this.storage.deletePoll(targetId.get())
+            .exceptionally(ex -> {
+                sender.sendMessage("Unknown poll " + id);
+                return null;
+            })
+            .thenRun(() ->
+                sender.sendMessage("Deleted poll " + id));
     }
 
     @Command("poll list [option]")

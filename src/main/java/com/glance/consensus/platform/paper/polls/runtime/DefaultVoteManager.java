@@ -1,97 +1,197 @@
 package com.glance.consensus.platform.paper.polls.runtime;
 
+import com.glance.consensus.platform.paper.polls.domain.Poll;
+import com.glance.consensus.platform.paper.polls.domain.PollRules;
 import com.glance.consensus.platform.paper.polls.domain.VoteResult;
 import com.glance.consensus.platform.paper.polls.persistence.PollStorage;
+import com.glance.consensus.platform.paper.polls.utils.RuleUtils;
+import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.Singleton;
-import org.bukkit.plugin.Plugin;
+import lombok.extern.slf4j.Slf4j;
+import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
+@Slf4j
 @Singleton
 public class DefaultVoteManager implements VoteManager {
 
-    private final Plugin plugin;
-    private final PollManager pollManager;
-    private final Provider<PollStorage> storageProvider;
+    private final @NotNull Provider<PollStorage> storageProvider;
 
+    @Inject
     public DefaultVoteManager(
-        @NotNull final Plugin plugin,
-        @NotNull final PollManager pollManager,
-        @NotNull final Provider<PollStorage> storageProvider
+        @NotNull Provider<PollStorage> storageProvider
     ) {
-        this.plugin = plugin;
-        this.pollManager = pollManager;
         this.storageProvider = storageProvider;
     }
 
+    /** in-flight guard: pollId -> set of playerIds currently persisting a selection */
+    private final Map<UUID, Set<UUID>> inFlight = new ConcurrentHashMap<>();
+
     @Override
-    public CompletableFuture<VoteResult> attemptVote(
-        @NotNull UUID pollId,
-        @NotNull UUID voterId,
-        int optionIdx
+    public @NotNull CompletableFuture<VoteResult> attemptVote(
+            @NotNull Player player,
+            @NotNull PollRuntime runtime,
+            int optionIndex
     ) {
-        var rtOpt = pollManager.get(pollId);
-        if (rtOpt.isEmpty()) {
-            return CompletableFuture.completedFuture(
-                VoteResult.of(VoteResult.Status.NOT_FOUND, pollId, Set.of(),
-                    "<red>Poll not found</red>", VoteResult.NextAction.NONE));
+        final Poll poll = runtime.getPoll();
+        final UUID pollId = poll.getId();
+        final UUID playerId = player.getUniqueId();
+
+        log.warn("In Attempting vote for poll {}", poll.getPollIdentifier());
+
+        // Serialize attempts per (poll, player)
+        if (!acquireInFlight(pollId, playerId)) {
+            return CompletableFuture.completedFuture(new VoteResult(
+                    pollId,
+                    VoteResult.Status.NO_OP,
+                    runtime.selectionSnapshot(playerId),
+                    "<gray>Still saving your previous click...</gray>"
+            ));
         }
 
-        var rt = rtOpt.get();
-        var poll = rt.getPoll();
-        var options = poll.getOptions();
+        log.warn("Acquired");
 
+        // Fast validations
         if (poll.isClosed()) {
-            return CompletableFuture.completedFuture(
-                VoteResult.of(VoteResult.Status.CLOSED, pollId, rt.selectionSnapshot(voterId),
-                        "<red>Poll is no longer accepting votes!</red>", VoteResult.NextAction.NONE));
+            releaseInFlight(pollId, playerId);
+            return CompletableFuture.completedFuture(new VoteResult(
+                    pollId,
+                    VoteResult.Status.REJECTED_CLOSED,
+                    runtime.selectionSnapshot(playerId),
+                    "<red>This poll is closed</red>"
+            ));
         }
 
-        if (optionIdx < 0 || optionIdx >= options.size()) {
-            return CompletableFuture.completedFuture(
-                VoteResult.of(VoteResult.Status.INVALID_OPTION, pollId, rt.selectionSnapshot(voterId),
-                        "<red>Invalid poll option</red>", VoteResult.NextAction.NONE));
+        log.warn("Not closed");
+
+        if (optionIndex < 0 || optionIndex >= poll.getOptions().size()) {
+            releaseInFlight(pollId, playerId);
+            return CompletableFuture.completedFuture(new VoteResult(
+                    pollId,
+                    VoteResult.Status.REJECTED_RULES,
+                    runtime.selectionSnapshot(playerId),
+                    "<red>Invalid option</red>"
+            ));
         }
 
-        var rules = poll.getRules();
-        var current = rt.selectionSnapshot(voterId);
-        var next = new HashSet<>(current);
+        log.warn("Valid option {}", optionIndex);
 
+        // Compute proposed selection based on rules
+        final PollRules effective = RuleUtils.effectiveRules(player, poll.getRules());
+        final Set<Integer> before = runtime.selectionSnapshot(playerId);
+        final Set<Integer> proposed = computeNewSelectionSet(before, optionIndex, effective);
+
+        log.warn("Before {} | Proposed {}", before, proposed);
+
+        // Resubmission policy (only applies if change is real)
+        if (!effective.allowResubmissions() && !before.isEmpty() && !before.equals(proposed)) {
+            releaseInFlight(pollId, playerId);
+            return CompletableFuture.completedFuture(new VoteResult(
+                    pollId,
+                    VoteResult.Status.REJECTED_RULES,
+                    before,
+                    "<red>You already voted. Resubmissions are disabled</red>"
+            ));
+        }
+
+        log.warn("Allowed to vote");
+
+        // Max selections
+        if (effective.multipleChoice()) {
+            final int max = Math.max(1, effective.maxSelections());
+            if (proposed.size() > max) {
+                releaseInFlight(pollId, playerId);
+                return CompletableFuture.completedFuture(new VoteResult(
+                        pollId,
+                        VoteResult.Status.REJECTED_RULES,
+                        before,
+                        "<red>You can select at most " + max + " option" + (max == 1 ? "" : "s") + "</red>"
+                ));
+            }
+        }
+
+        log.warn("Hasn't maxxed selection");
+
+        if (before.equals(proposed)) {
+            releaseInFlight(pollId, playerId);
+            return CompletableFuture.completedFuture(new VoteResult(
+                    pollId,
+                    VoteResult.Status.NO_OP,
+                    before,
+                    "<gray>No change</gray>"
+            ));
+        }
+
+        // Optimistic apply to runtime
+        runtime.applySelection(playerId, proposed);
+
+        // Persist atomically
+        return storageProvider.get()
+                .saveVoterSelection(pollId, playerId, proposed)
+                .thenApply(v -> new VoteResult(
+                        pollId,
+                        VoteResult.Status.ACCEPTED,
+                        proposed,
+                        successMessage(effective, before, proposed)
+                ))
+                .exceptionally(ex -> {
+                    log.warn("FAILED TO SAVE VOTE: a", ex);
+                    // Transactional Rollback optimistic change
+                    runtime.applySelection(playerId, before);
+                    return new VoteResult(
+                            pollId,
+                            VoteResult.Status.ROLLBACK,
+                            before,
+                            "<red>Couldn’t save your vote. Please try again</red>"
+                    );
+                })
+                .whenComplete((r, t) -> releaseInFlight(pollId, playerId));
+    }
+
+    /* -------------------- helpers -------------------- */
+
+    private static @NotNull Set<Integer> computeNewSelectionSet(
+            @NotNull Set<Integer> before,
+            int clickedIndex,
+            @NotNull PollRules rules
+    ) {
         if (!rules.multipleChoice()) {
-            boolean alreadyVoted = current.size() == 1 && current.contains(optionIdx);
-            if (alreadyVoted && !rules.allowResubmissions()) {
-                // no more voting allowed
-                return CompletableFuture.completedFuture(
-                    VoteResult.of(VoteResult.Status.REJECTED, pollId, current,
-                            "<gold>You've already voted for that option</gold>",
-                            VoteResult.NextAction.OPEN_RESULTS));
-            }
-
-            // resubmission
-            next.clear();
-            next.add(optionIdx);
-        } else {
-            if (next.contains(optionIdx)) {
-                next.remove(optionIdx);
-            } else {
-                if (next.size() >= rules.maxSelections()) {
-                    return CompletableFuture.completedFuture(
-                        VoteResult.of(VoteResult.Status.REJECTED, pollId, current,
-                            "<red>You can select up to " + rules.maxSelections() + " options</red>",
-                                VoteResult.NextAction.REFRESH_DISPLAY));
-                }
-                next.add(optionIdx);
-            }
+            // single-choice: always replace with the clicked option
+            return Set.of(clickedIndex);
         }
 
-        boolean accepted = rt.vote(voterId, next);
+        // multiple-choice: toggle clicked index
+        final Set<Integer> next = new HashSet<>(before);
+        if (next.contains(clickedIndex)) next.remove(clickedIndex);
+        else next.add(clickedIndex);
 
-        return CompletableFuture.completedFuture(null);
+        return Collections.unmodifiableSet(next);
+    }
+
+    private static String successMessage(PollRules rules, Set<Integer> before, Set<Integer> after) {
+        if (rules.multipleChoice()) {
+            return "<green>Selection updated.</green>";
+        }
+        if (before.isEmpty()) return "<green>Vote recorded.</green>";
+        if (before.equals(after)) return "<gray>No change.</gray>";
+        return "<green>Vote changed.</green>";
+    }
+
+    private boolean acquireInFlight(UUID pollId, UUID playerId) {
+        inFlight.computeIfAbsent(pollId, k -> ConcurrentHashMap.newKeySet());
+        return inFlight.get(pollId).add(playerId);
+    }
+
+    private void releaseInFlight(UUID pollId, UUID playerId) {
+        final Set<UUID> set = inFlight.get(pollId);
+        if (set == null) return;
+        set.remove(playerId);
+        if (set.isEmpty()) inFlight.remove(pollId);
     }
 
 }

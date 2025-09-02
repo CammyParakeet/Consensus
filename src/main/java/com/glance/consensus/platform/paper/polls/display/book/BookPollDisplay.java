@@ -1,10 +1,11 @@
 package com.glance.consensus.platform.paper.polls.display.book;
 
 import com.glance.consensus.platform.paper.polls.display.PollDisplay;
+import com.glance.consensus.platform.paper.polls.display.PollDisplayNavigator;
 import com.glance.consensus.platform.paper.polls.display.book.builder.BookBuilder;
 import com.glance.consensus.platform.paper.polls.display.book.builder.BookUtils;
 import com.glance.consensus.platform.paper.polls.display.format.AlignmentUtils;
-import com.glance.consensus.platform.paper.polls.display.format.PollTextFormatter;
+import com.glance.consensus.platform.paper.polls.display.format.PollTextBuilder;
 import com.glance.consensus.platform.paper.polls.display.format.VoteBadgeUtils;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
 import com.glance.consensus.platform.paper.polls.domain.PollOption;
@@ -13,18 +14,29 @@ import com.glance.consensus.platform.paper.polls.runtime.PollRuntime;
 import com.glance.consensus.platform.paper.polls.utils.RuleUtils;
 import com.glance.consensus.platform.paper.utils.ComponentUtils;
 import com.glance.consensus.platform.paper.utils.Mini;
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import lombok.extern.slf4j.Slf4j;
 import net.kyori.adventure.text.Component;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.BookMeta;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 
+@Slf4j
 @Singleton
 public final class BookPollDisplay implements PollDisplay {
+
+    private final PollDisplayNavigator navigator;
+
+    @Inject
+    public BookPollDisplay(
+        @NotNull final PollDisplayNavigator navigator
+    ) {
+        this.navigator = navigator;
+    }
 
     @Override
     public @NotNull Mode mode() {
@@ -37,25 +49,57 @@ public final class BookPollDisplay implements PollDisplay {
         @NotNull PollRuntime runtime,
         @NotNull PollRules rules
     ) {
-        ItemStack book = buildVotingBook(player, runtime, rules);
-        player.openBook(book);
-
-        if (rules.canViewResults()) {
-            book.editMeta(m -> {
-                BookMeta bm = (BookMeta) m;
-
-            });
-        }
+        refresh(player, runtime, RefreshCause.MANUAL);
     }
 
     @Override
     public void openResults(@NotNull Player player, @NotNull PollRuntime runtime, @NotNull PollRules ctx) {
-
+        ItemStack book = buildResultsBook(player, runtime);
+        player.openBook(book);
     }
 
     @Override
     public void refresh(@NotNull Player player, @NotNull PollRuntime runtime, @NotNull RefreshCause cause) {
+        final PollRules effective = RuleUtils.effectiveRules(player, runtime.getPoll().getRules());
 
+        final boolean resultsOnly = shouldShowResultsOnly(player, runtime, effective);
+        log.warn("Should show ONLY results?? {}", resultsOnly);
+        final ItemStack book = resultsOnly
+                ? buildResultsBook(player, runtime)
+                : buildVotingBook(player, runtime, effective);
+
+        player.openBook(book);
+    }
+
+    /**
+     * Results; only if:
+     * <li>poll is closed, OR</li>
+     * <li>resubmissions are disabled AND the viewer has already "used up" their votes
+     * (single-choice: has any vote; multi-choice: has >= maxSelections)</li>
+     */
+    private boolean shouldShowResultsOnly(
+            @NotNull Player viewer,
+            @NotNull PollRuntime runtime,
+            @NotNull PollRules rules
+    ) {
+        final Poll poll = runtime.getPoll();
+        if (poll.isClosed()) return true;
+
+        if (!rules.allowResubmissions()) {
+            final Set<Integer> sel = runtime.selectionSnapshot(viewer.getUniqueId());
+            if (sel.isEmpty()) return false;
+
+            if (!rules.multipleChoice()) {
+                // single-choice: any vote consumes your one submission
+                return true;
+            }
+
+            final int max = Math.max(1, rules.maxSelections());
+            // multi-choice: if they've met or exceeded the cap, they’re "done"
+            return sel.size() >= max;
+        }
+
+        return false;
     }
 
     public ItemStack buildVotingBook(
@@ -72,19 +116,25 @@ public final class BookPollDisplay implements PollDisplay {
 
         /* Handling Poll Question */
         List<Component> page = new ArrayList<>(
-                PollTextFormatter.formatQuestion(
+                PollTextBuilder.formatQuestion(
                         poll,
                         finalRules,
-                        PollTextFormatter.Options.voting()));
+                        PollTextBuilder.Options.bookVoting()));
 
         // Gap
-        page.add(Component.empty());
+        //page.add(Component.empty());
 
         /* Handling Poll Answers */ // todo need effective rules?
-        page.addAll(PollTextFormatter.formatAnswers(
-                poll,
-                PollTextFormatter.Options.voting(),
-                runtime.selectionSnapshot(viewer.getUniqueId())));
+        page.addAll(PollTextBuilder.formatAnswers(
+            poll,
+            PollTextBuilder.Options.bookVoting(),
+            viewer,
+            runtime.selectionSnapshot(viewer.getUniqueId()),
+            (a, index) -> {
+                if (!(a instanceof Player p)) return;
+                this.navigator.handleVoteClick(p, runtime, index);
+            }
+        ));
 
         builder.addPage(page);
 
@@ -118,13 +168,14 @@ public final class BookPollDisplay implements PollDisplay {
         final List<PollOption> options = poll.getOptions();
 
         final Set<Integer> viewerVotes = runtime.selectionSnapshot(viewer.getUniqueId());
+
         final int totalVotes = Math.max(0, options.stream().mapToInt(PollOption::votes).sum());
 
-        List<Component> page = new ArrayList<>(PollTextFormatter.formatQuestion(
+        List<Component> page = new ArrayList<>(PollTextBuilder.formatQuestion(
                 poll,
                 rules,
-                PollTextFormatter.Options.voting()));
-        // todo add results option
+                PollTextBuilder.Options.bookResults())
+        );
 
         int answerCount = options.size();
         int missing = Math.max(0, 6 - answerCount);
@@ -149,9 +200,6 @@ public final class BookPollDisplay implements PollDisplay {
         }
 
         page.add(BookUtils.SIDE_DIVIDER);
-
-        String state = poll.isClosed() ? "<red><bold>Closed</bold></red>" : "<green>Active</green>";
-        // todo where to add this? probs question
 
         return page;
     }
@@ -187,6 +235,5 @@ public final class BookPollDisplay implements PollDisplay {
         Arrays.fill(arr, '█');
         return new String(arr);
     }
-
 
 }

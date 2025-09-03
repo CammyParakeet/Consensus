@@ -127,7 +127,6 @@ public final class DefaultPollManager implements PollManager {
 
     @Override
     public CompletableFuture<UUID> registerPoll(@NotNull Player creator, @NotNull Poll poll) {
-        log.warn("About to use storage to create poll {} | have storage? {}", poll.getPollIdentifier(), storageProvider.get());
         return storageProvider.get().createPoll(poll)
             .thenApply(p -> {
                 var runtime = new PollRuntime(poll);

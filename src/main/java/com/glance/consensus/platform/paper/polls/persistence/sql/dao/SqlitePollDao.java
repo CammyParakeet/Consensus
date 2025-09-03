@@ -1,7 +1,7 @@
 package com.glance.consensus.platform.paper.polls.persistence.sql.dao;
 
 import com.glance.consensus.platform.paper.polls.persistence.sql.data.PollRow;
-import org.jdbi.v3.sqlobject.config.RegisterBeanMapper;
+import org.jdbi.v3.sqlobject.config.RegisterConstructorMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
@@ -9,6 +9,7 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 import java.util.List;
 import java.util.Optional;
 
+@RegisterConstructorMapper(PollRow.class)
 public interface SqlitePollDao {
 
     /* ---- Schema ---- */
@@ -20,7 +21,7 @@ public interface SqlitePollDao {
 
     @SqlUpdate("""
         CREATE TABLE IF NOT EXISTS polls (
-            id TEXT PRIMARY KEY
+            id TEXT PRIMARY KEY,
             readable_id TEXT,
             owner TEXT NOT NULL,
             question_raw TEXT NOT NULL,
@@ -76,8 +77,8 @@ public interface SqlitePollDao {
     @SqlUpdate("""
         INSERT INTO polls(
             id, readable_id, owner, question_raw,
-            created_at, closes_at, closed,
-            multiple_choice, max_selections, allow_resubmissions, show_results   
+            created_at, closes_at, closed_at, closed,
+            multiple_choice, max_selections, allow_resubmissions, show_results
         ) VALUES (
             :id, :readableId, :owner, :questionRaw,
             :createdAt, :closesAt, :closedAt, :closed,
@@ -127,11 +128,11 @@ public interface SqlitePollDao {
         @Bind("closedAt") long closedAt
     );
 
-    @RegisterBeanMapper(PollRow.class)
+    //@RegisterBeanMapper(PollRow.class)
     @SqlQuery("SELECT * FROM polls WHERE id = :id")
     Optional<PollRow> findPoll(@Bind("id") String pollId);
 
-    @RegisterBeanMapper(PollRow.class)
+    //@RegisterBeanMapper(PollRow.class)
     @SqlQuery("""
         SELECT * FROM polls
         WHERE closed = 0 AND (closes_at IS NULL or closes_at > :now)
@@ -145,7 +146,7 @@ public interface SqlitePollDao {
     """)
     int closeOverdue(@Bind("now") long nowMillis);
 
-    @RegisterBeanMapper(PollRow.class)
+    //@RegisterBeanMapper(PollRow.class)
     @SqlQuery("""
         SELECT * FROM polls
         WHERE (closed = 0 AND (closes_at IS NULL OR closes_at > :now))

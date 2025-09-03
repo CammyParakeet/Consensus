@@ -110,15 +110,15 @@ public final class DefaultPollManager implements PollManager {
         Instant closeAt = now.plus(Duration.ofMinutes(minutes));
 
         var poll = new Poll(
-                id,
-                session.getSuppliedId() != null ? session.getSuppliedId() : id.toString(),
-                creator.getUniqueId(),
-                question,
-                now,
-                closeAt,
-                null,
-                normalized,
-                rules
+            id,
+            session.getSuppliedId() != null ? session.getSuppliedId() : id.toString(),
+            creator.getUniqueId(),
+            question,
+            now,
+            closeAt,
+            null,
+            normalized,
+            rules
         );
         poll.setClosed(false);
 
@@ -127,11 +127,18 @@ public final class DefaultPollManager implements PollManager {
 
     @Override
     public CompletableFuture<UUID> registerPoll(@NotNull Player creator, @NotNull Poll poll) {
-        return storageProvider.get().createPoll(poll).thenApply(p -> {
-            var runtime = new PollRuntime(poll);
-            polls.put(poll.getId(), runtime);
-            return poll.getId();
-        });
+        log.warn("About to use storage to create poll {} | have storage? {}", poll.getPollIdentifier(), storageProvider.get());
+        return storageProvider.get().createPoll(poll)
+            .thenApply(p -> {
+                var runtime = new PollRuntime(poll);
+                polls.put(poll.getId(), runtime);
+                return poll.getId();
+            })
+            .exceptionally(ex -> {
+               logger.severe("Failed to register poll " + poll.getPollIdentifier()
+                       + " | " + ex.getMessage());
+               return null;
+            });
     }
 
     @Override

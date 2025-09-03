@@ -1,17 +1,18 @@
 package com.glance.consensus.platform.paper.polls.persistence.sql.dao;
 
 import com.glance.consensus.platform.paper.polls.persistence.sql.data.AnswerRow;
-import org.jdbi.v3.sqlobject.config.RegisterBeanMapper;
+import org.jdbi.v3.sqlobject.config.RegisterConstructorMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.statement.SqlBatch;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 
 import java.util.List;
 
+@RegisterConstructorMapper(AnswerRow.class)
 public interface SqliteAnswerDao {
 
     @SqlBatch("""
-        INSERRT INTO poll_answers (poll_id, idx, label_raw, tooltip_raw)
+        INSERT INTO poll_answers (poll_id, idx, label_raw, tooltip_raw)
         VALUES (:pollId, :idx, :label, :tooltip)
     """)
     void insertAnswers(
@@ -21,7 +22,7 @@ public interface SqliteAnswerDao {
         @Bind("tooltip") List<String> tooltipOrNull
     );
 
-    @RegisterBeanMapper(AnswerRow.class)
+    //@RegisterBeanMapper(AnswerRow.class)
     @SqlQuery("""
         SELECT poll_id, idx, label_raw, tooltip_raw
         FROM poll_answers

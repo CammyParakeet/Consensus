@@ -7,13 +7,14 @@ import com.google.inject.Injector;
 import lombok.Getter;
 import org.bukkit.plugin.java.JavaPlugin;
 
+@Getter
 public class ConsensusPlugin extends JavaPlugin {
 
-    @Getter
     private Injector injector;
 
     @Override
     public void onLoad() {
+        saveDefaultConfig();
         this.injector = Guice.createInjector(new ConsensusModule(this));
         //getLogger().setLevel(Level.FINE);
     }

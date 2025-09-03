@@ -3,6 +3,7 @@ package com.glance.consensus.platform.paper.polls.builder.dialog;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildNavigator;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildScreen;
 import com.glance.consensus.platform.paper.polls.builder.PollBuildSession;
+import com.glance.consensus.platform.paper.polls.builder.PollBuilderSessions;
 import com.glance.consensus.platform.paper.polls.display.book.builder.BookUtils;
 import com.glance.consensus.platform.paper.polls.display.format.PollTextBuilder;
 import com.glance.consensus.platform.paper.polls.domain.Poll;
@@ -41,14 +42,17 @@ public final class ConfirmScreen implements PollBuildScreen {
 
     private final PollBuildNavigator navigator;
     private final PollManager pollManager;
+    private final PollBuilderSessions sessions;
 
     @Inject
     public ConfirmScreen(
         @NotNull PollBuildNavigator navigator,
-        @NotNull PollManager manager
+        @NotNull PollManager manager,
+        @NotNull PollBuilderSessions sessions
     ) {
         this.navigator = navigator;
         this.pollManager = manager;
+        this.sessions = sessions;
     }
 
     @Override
@@ -117,9 +121,9 @@ public final class ConfirmScreen implements PollBuildScreen {
                         Component.text("Submit"),
                         Component.text("Click to submit your current Poll Builder"),
                         180,
-                        DialogAction.customClick((view, audience) -> {
-                            this.pollManager.registerPoll(player, poll);
-                        },
+                        DialogAction.customClick((view, audience) ->
+                            this.pollManager.registerPoll(player, poll)
+                                .thenRun(() -> this.sessions.clear(player.getUniqueId())),
                         ClickCallback.Options.builder()
                             .uses(1)
                             .lifetime(ClickCallback.DEFAULT_LIFETIME)

@@ -1,0 +1,17 @@
+# Consensus - storage configuration
+storage:
+  backend: SQLITE
+
+  # Only used when backend = FLATFILE
+  flatfile:
+    dir: playerdata/polls
+
+  # SQL settings (SQLite)
+  sql:
+    # ${plugin.data} expands to the plugins data folder at runtime
+    jdbcUrl: "jdbc:sqlite:${plugin.data}/polls.db"
+    username: ""   # not used by SQLite
+    password: ""   # not used by SQLite
+    pool:
+      maxSize: 6
+      minIdle: 2

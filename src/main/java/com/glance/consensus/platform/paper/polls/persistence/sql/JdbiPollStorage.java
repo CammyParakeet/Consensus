@@ -38,11 +38,11 @@ public class JdbiPollStorage implements PollStorage {
                 Class.forName("org.sqlite.JDBC");
             } catch (ClassNotFoundException e) {
                 plugin.getLogger().severe("""
-                        SQLite driver not found. Options:
-                          - Use the '-with-sqlite' jar of the plugin, or
-                          - Install a dedicated SQLite driver plugin, or
-                          - Switch backend to FLATFILE in config.
-                        """);
+                    SQLite driver not found. Options:
+                      - Use the '-with-sqlite' jar of the plugin, or
+                      - Install a dedicated SQLite driver plugin, or
+                      - Switch backend to FLATFILE in config.
+                    """);
                 throw new RuntimeException(e);
             }
         }

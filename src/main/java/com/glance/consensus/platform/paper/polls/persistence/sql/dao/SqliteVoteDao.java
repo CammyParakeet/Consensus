@@ -1,7 +1,7 @@
 package com.glance.consensus.platform.paper.polls.persistence.sql.dao;
 
 import com.glance.consensus.platform.paper.polls.persistence.sql.data.SelectionRow;
-import org.jdbi.v3.sqlobject.config.RegisterBeanMapper;
+import org.jdbi.v3.sqlobject.config.RegisterConstructorMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.statement.SqlBatch;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
@@ -9,6 +9,7 @@ import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
 import java.util.List;
 
+@RegisterConstructorMapper(SelectionRow.class)
 public interface SqliteVoteDao {
 
     @SqlUpdate("""
@@ -27,7 +28,7 @@ public interface SqliteVoteDao {
         @Bind("idx") List<Integer> selections
     );
 
-    @RegisterBeanMapper(SelectionRow.class)
+    //@RegisterBeanMapper(SelectionRow.class)
     @SqlQuery("""
         SELECT voter_id, option_idx
         FROM voter_selection

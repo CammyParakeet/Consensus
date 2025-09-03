@@ -56,6 +56,18 @@ java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(21))
 }
 
+// Setup SQLite Build
+val sqlite: Configuration by configurations.creating
+dependencies { sqlite("org.xerial:sqlite-jdbc:3.46.0.1") }
+
+val shadowWithSQLite by tasks.registering(ShadowJar::class) {
+    group = "build"
+    archiveClassifier.set("with-sqlite")
+    from(sourceSets.main.get().output)
+    configurations = listOf(project.configurations.runtimeClasspath.get(), sqlite)
+    //minimize()
+}
+
 tasks {
     build {
         dependsOn(shadowJar)
@@ -86,13 +98,6 @@ configure<PaperPluginDescription> {
     apiVersion = "1.21"
     version = "Git-${indraGit.commit()?.name?.take(7) ?: "unknown"}"
     //version = "1.0.0"
-
     main = "com.glance.consensus.platform.paper.ConsensusPlugin"
 
-//    serverDependencies {
-//        create("PlaceholderAPI") {
-//            required = false
-//            load = PaperPluginDescription.RelativeLoadOrder.AFTER
-//        }
-//    }op
 }

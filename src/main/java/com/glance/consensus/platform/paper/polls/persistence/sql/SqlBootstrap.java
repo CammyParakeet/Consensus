@@ -10,10 +10,14 @@ import lombok.Getter;
 import lombok.experimental.Accessors;
 import org.bukkit.plugin.Plugin;
 import org.jdbi.v3.core.Jdbi;
+import org.jdbi.v3.core.mapper.reflect.CaseInsensitiveColumnNameMatcher;
+import org.jdbi.v3.core.mapper.reflect.ReflectionMappers;
+import org.jdbi.v3.core.mapper.reflect.SnakeCaseColumnNameMatcher;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 import org.jetbrains.annotations.NotNull;
 
 import javax.sql.DataSource;
+import java.util.List;
 
 @Singleton
 @Getter
@@ -48,6 +52,11 @@ public class SqlBootstrap {
                 .installPlugins()
                 .installPlugin(new SqlObjectPlugin());
 
+        this.jdbi.getConfig(ReflectionMappers.class)
+            .setColumnNameMatchers(List.of(
+                new SnakeCaseColumnNameMatcher(),
+                new CaseInsensitiveColumnNameMatcher()));
+
         this.dialect = url.startsWith("jdbc:sqlite") ? Dialect.SQLITE : Dialect.MYSQL;
 
         // Create schema once
@@ -57,7 +66,7 @@ public class SqlBootstrap {
 
                 dao.createPolls();
                 dao.createAnswers();
-                dao.createAnswers();
+                dao.createVotes();
 
                 dao.idxPollsActive();
                 dao.idxPollsClosedAt();

@@ -1,7 +1,6 @@
 package com.glance.consensus.platform.paper.polls.persistence;
 
 import com.glance.consensus.platform.paper.polls.domain.Poll;
-import com.glance.consensus.platform.paper.polls.runtime.PollRuntime;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;

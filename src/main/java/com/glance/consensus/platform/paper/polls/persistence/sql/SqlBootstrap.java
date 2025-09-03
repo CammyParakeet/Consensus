@@ -1,7 +1,7 @@
 package com.glance.consensus.platform.paper.polls.persistence.sql;
 
 import com.glance.consensus.platform.paper.polls.persistence.config.PollStorageConfig;
-import com.glance.consensus.platform.paper.polls.persistence.config.PollStorageProvider;
+import com.glance.consensus.platform.paper.polls.persistence.sql.dao.SqlitePollDao;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.zaxxer.hikari.HikariConfig;
@@ -53,7 +53,17 @@ public class SqlBootstrap {
         // Create schema once
         if (dialect == Dialect.SQLITE) {
             jdbi.useExtension(SqlitePollDao.class, dao -> {
-                // todo
+                try { dao.pragmaFK(); } catch (Exception ignored) {}
+
+                dao.createPolls();
+                dao.createAnswers();
+                dao.createAnswers();
+
+                dao.idxPollsActive();
+                dao.idxPollsClosedAt();
+
+                dao.idxVotesPoll();
+                dao.idxVotesPollVoter();
             });
         } else {
             throw new UnsupportedOperationException();

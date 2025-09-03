@@ -16,6 +16,7 @@ import dev.triumphteam.gui.element.GuiItem;
 import dev.triumphteam.gui.paper.Gui;
 import dev.triumphteam.gui.paper.builder.item.ItemBuilder;
 import dev.triumphteam.nova.MutableState;
+import lombok.extern.slf4j.Slf4j;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
@@ -31,6 +32,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.Supplier;
 
+@Slf4j
 @Singleton
 public class PollsMenu {
 
@@ -68,7 +70,7 @@ public class PollsMenu {
     }
 
     public void open(@NotNull Player player, @NotNull Options options) {
-        final List<PollRuntime> index = buildIndex(options.scope);
+        List<PollRuntime> index = buildIndex(options.scope);
         if (index.isEmpty()) {
             Gui.of(1)
                 .title(Mini.parseMini("<red>No Polls found"))
@@ -88,11 +90,13 @@ public class PollsMenu {
                 MutableState<PollListOption> scope = comp.remember(options.scope);
 
                 comp.render(container -> {
+                    List<PollRuntime> currentIndex = buildIndex(scope.get());
+
                     fillBorder(container);
 
-                    renderPolls(container, player, index, page.get(), perPage, slots);
+                    renderPolls(container, player, currentIndex, page.get(), perPage, slots);
 
-                    // todo buttons
+                    renderButtons(container, page, maxPage, scope, () -> {});
                 });
             })
             .build();
@@ -147,7 +151,9 @@ public class PollsMenu {
     }
 
     private GuiItem<Player, ItemStack> buildPollIcon(Player viewer, PollRuntime rt) {
-        final ItemStack stack = ItemStack.of(Material.MAP);
+        boolean closed = rt.getPoll().isClosed();
+        Material mat = closed ? Material.BOOK : Material.MAP;
+        final ItemStack stack = ItemStack.of(mat);
         stack.editMeta(meta -> {
             var parsed = Mini.parseMini("<reset>" + rt.getPoll().getQuestionRaw())
                     .decoration(TextDecoration.ITALIC, false);
@@ -155,6 +161,8 @@ public class PollsMenu {
 
             // Lore = activity lines (badge + closes/closed info)
             meta.lore(activityLore(rt.getPoll()));
+
+            if (closed) meta.setEnchantmentGlintOverride(true);
         });
 
         return ItemBuilder
@@ -207,6 +215,46 @@ public class PollsMenu {
         GuiItem<Player, ItemStack> filler = ItemBuilder.from(pane).asGuiItem();
         final int size = ROWS * 9;
         for (int i = 0; i < size; i++) setAtSlot(container, i, filler);
+    }
+
+    private void renderButtons(
+        GuiContainer<Player, ItemStack> container,
+        MutableState<Integer> page,
+        int maxPage,
+        MutableState<PollListOption> scope,
+        Runnable onScopeChange
+    ) {
+        placeIf(page.get() > 0, container, BTN_PREV, () -> {
+            ItemStack it = ItemStack.of(Material.ARROW);
+            it.editMeta(m -> m.displayName(Mini.parseMini("<yellow>Previous Page")
+                    .decoration(TextDecoration.ITALIC, false)));
+
+            return ItemBuilder.from(it).asGuiItem((p, ctx) -> page.update(v -> Math.max(0, v - 1)));
+        });
+
+        placeIf(true, container, BTN_FILTER, () -> {
+            final PollListOption currentScope = scope.get();
+            final String label = switch (currentScope) {
+                case ACTIVE -> "<green>Showing: Open</green> <gray>(click to toggle)</gray>";
+                case CLOSED -> "<yellow>Showing: Closed</yellow> <gray>(click to toggle)</gray>";
+                case ALL -> "<aqua>Showing: All</aqua> <gray>(click to toggle)</gray>";
+            };
+
+            ItemStack it = ItemStack.of(Material.COMPARATOR);
+            it.editMeta(m -> m.displayName(Mini.parseMini(label).decoration(TextDecoration.ITALIC, false)));
+            return ItemBuilder.from(it).asGuiItem((p, ctx) -> {
+               scope.update(PollsMenu::nextScope);
+               page.set(0);
+               onScopeChange.run();
+            });
+        });
+
+        placeIf(page.get() < maxPage, container, BTN_NEXT, () -> {
+            ItemStack it = ItemStack.of(Material.ARROW);
+            it.editMeta(m -> m.displayName(Mini.parseMini("<yellow>Next Page")
+                    .decoration(TextDecoration.ITALIC, false)));
+            return ItemBuilder.from(it).asGuiItem((p, ctx) -> page.update(v -> Math.min(maxPage, v + 1)));
+        });
     }
 
     /* ---- Slot Utils ---- */

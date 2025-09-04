@@ -29,7 +29,7 @@ Two JARs are shipped with each release:
 ---
 
 ## Installation
-1. Download either `Consensus.jar` or `Consensus-with-sqlite.jar` from [releases](/releases)
+1. Download either `Consensus.jar` or `Consensus-with-sqlite.jar` from [releases]([/releases](https://github.com/CammyParakeet/Consensus/releases))
 2. Place it in your server’s `plugins/` folder
 3. Restart the server to generate configuration files
 

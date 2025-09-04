@@ -11,8 +11,10 @@ import lombok.Data;
 import lombok.experimental.UtilityClass;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.JoinConfiguration;
 import net.kyori.adventure.text.event.ClickCallback;
 import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -37,6 +39,7 @@ public class PollTextBuilder {
         private final int targetOptions;
         private final int linesPerOptionMissing;
         private final boolean includeRulesHover;
+        private final boolean includeSelectionHover;
         private final boolean addVoteClick;
         private final VoteBadgeUtils.VoteStyle voteStyle;
         private final VoteBadgeUtils.Theme theme;
@@ -48,6 +51,7 @@ public class PollTextBuilder {
                     TARGET_OPTIONS,
                     LINES_PER_OPTION_MISSING,
                     true,
+                    false,
                     false,
                     VoteBadgeUtils.VoteStyle.CHECKBOX,
                     VoteBadgeUtils.Theme.defaultVote());
@@ -61,6 +65,7 @@ public class PollTextBuilder {
                     LINES_PER_OPTION_MISSING,
                     false,
                     true,
+                    true,
                     VoteBadgeUtils.VoteStyle.CHECKBOX,
                     VoteBadgeUtils.Theme.defaultVote());
         }
@@ -71,6 +76,7 @@ public class PollTextBuilder {
                     true,
                     TARGET_OPTIONS,
                     LINES_PER_OPTION_MISSING,
+                    false,
                     false,
                     false,
                     VoteBadgeUtils.VoteStyle.CHECKBOX,
@@ -85,12 +91,10 @@ public class PollTextBuilder {
     ) {
         List<Component> out = new ArrayList<>();
 
-        final String stateLabel = poll.isClosed() ? "Closed" : "Open";
-        final Component stateBadge = Mini.parseMini(
-                VoteBadgeUtils.buildBadge(stateLabel, !poll.isClosed(), VoteBadgeUtils.Theme.defaultActivity())
-        );
+        var parsed = center(poll.getQuestionRaw());
+        Component line = parsed.value();
 
-        final boolean showHint = options.includeRulesHover && !options.preview && !options.results;
+        final boolean showHint = options.includeSelectionHover && !options.preview && !options.results;
         final Component selectionHint;
         if (showHint) {
             final boolean multi = finalRules.multipleChoice() && finalRules.maxSelections() > 1;
@@ -100,37 +104,60 @@ public class PollTextBuilder {
             selectionHint = Component.empty();
         }
 
-        var parsed = center(poll.getQuestionRaw());
-        Component line = parsed.value();
-
-        Component hover = Component.empty();
-        hover = hover.append(stateBadge);
-
-        if (!poll.isClosed() && !options.preview) {
-            final Instant now = Instant.now();
-            final Instant closesAt = poll.getClosesAt();
-            if (now.isBefore(closesAt)) {
-                final Duration remaining = Duration.between(now, closesAt);
-                final String eta = formatDuration(remaining);
-                hover = hover.append(fullNewline())
-                    .append(Mini.parseMini("<gray>Closes in:</gray> <yellow>" + eta + "</yellow>"));
-            }
-        }
+        List<Component> hoverLines = new ArrayList<>(4);
 
         // If the title was truncated, add the full question on a new line
         if (parsed.truncated()) {
-            hover = hover.append(fullNewline())
-                    .append(Mini.parseMini(poll.getQuestionRaw()));
+            hoverLines.add(Mini.parseMini(poll.getQuestionRaw()));
         }
 
-        // Only add the selection hint if present (no stray blank lines)
+        List<Component> activity = activityLore(poll, !hoverLines.isEmpty());
+
+        if (options.preview && !activity.isEmpty()) {
+            int keep = (!hoverLines.isEmpty()) ? 2 : 1; // spacer+badge OR badge only
+            if (activity.size() > keep) {
+                activity = activity.subList(0, keep);
+            }
+        }
+        hoverLines.addAll(activity);
+
+        // Only add the selection hint if present
         if (!ComponentUtils.isVisuallyEmpty(selectionHint)) {
-            hover = hover.append(fullNewline()).append(selectionHint);
+           hoverLines.add(selectionHint);
         }
 
+        Component hover = Component.join(JoinConfiguration.newlines(), hoverLines);
         line = line.hoverEvent(hover);
+
         out.add(line);
         return out;
+    }
+
+    public @NotNull List<Component> activityLore(@NotNull Poll poll, boolean addEmpty) {
+        List<Component> out = new ArrayList<>(addEmpty ? 4 : 3);
+        if (addEmpty) out.add(Component.empty());
+
+        final String stateLabel = poll.isClosed() ? "Closed" : "Open";
+        out.add(Mini.parseMini(
+                VoteBadgeUtils.buildBadge(stateLabel, !poll.isClosed(), VoteBadgeUtils.Theme.defaultActivity())
+        ));
+
+        final Instant now = Instant.now();
+        if (!poll.isClosed()) {
+            final Instant closesAt = poll.getClosesAt();
+            if (now.isBefore(closesAt)) {
+                final Duration remaining = Duration.between(now, closesAt);
+                out.add(Mini.parseMini("<gray>Closes in:</gray> <yellow>" + PollTextBuilder.formatDuration(remaining) + "</yellow>"));
+            }
+        } else {
+            final Instant closedAt = poll.getClosesAt();
+            final Duration since = Duration.between(closedAt, now).abs();
+            out.add(Mini.parseMini("<gray>Closed:</gray> <yellow>" + briefAgo(since) + " ago</yellow>"));
+        }
+
+        return out.stream()
+                .map(c -> c.decoration(TextDecoration.ITALIC, false))
+                .toList();
     }
 
     public List<Component> formatAnswers(
@@ -168,12 +195,18 @@ public class PollTextBuilder {
             Component tooltip = opt.tooltipRaw() != null
                     ? Mini.parseMini(opt.tooltipRaw())
                     : Component.empty();
+            boolean hasTooltip = !ComponentUtils.isVisuallyEmpty(tooltip);
+            Component fullLabel = Mini.parseMini(opt.labelRaw());
 
             Component hoverComp;
-            if (answerParsed.truncated() && !ComponentUtils.isVisuallyEmpty(tooltip)) {
-                hoverComp = Mini.parseMini(opt.labelRaw()).append(fullNewline(), tooltip);
+            if (answerParsed.truncated()) {
+                // Always show full label when the displayed label was truncated
+                hoverComp = hasTooltip
+                        ? Component.text().append(fullLabel, fullNewline(), tooltip).build()
+                        : fullLabel;
             } else {
-                hoverComp = tooltip;
+                // Not truncated: only show tooltip if present
+                hoverComp = hasTooltip ? tooltip : Component.empty();
             }
 
             final Component actionHint = options.preview ? Component.empty() : buildActionHint(poll, player, selected);
@@ -200,9 +233,21 @@ public class PollTextBuilder {
 
             answers.add(line);
         }
+
         answers.add(BookUtils.SIDE_DIVIDER);
 
         return answers;
+    }
+
+    private static @NotNull String briefAgo(@NotNull Duration d) {
+        long s = Math.max(0, d.getSeconds());
+        long days = s / 86400; s %= 86400;
+        long hrs  = s / 3600;  s %= 3600;
+        long mins = s / 60;
+        if (days > 0) return days + "d";
+        if (hrs  > 0) return hrs  + "h";
+        if (mins > 0) return mins + "m";
+        return "now";
     }
 
     private Component buildActionHint(

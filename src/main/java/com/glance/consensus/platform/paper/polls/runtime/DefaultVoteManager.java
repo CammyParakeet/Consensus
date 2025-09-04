@@ -78,15 +78,42 @@ public class DefaultVoteManager implements VoteManager {
         final Set<Integer> before = runtime.selectionSnapshot(playerId);
         final Set<Integer> proposed = computeNewSelectionSet(before, optionIndex, effective);
 
-        // Resubmission policy (only applies if change is real)
-        if (!effective.allowResubmissions() && !before.isEmpty() && !before.equals(proposed)) {
+        if (before.equals(proposed)) {
             releaseInFlight(pollId, playerId);
             return CompletableFuture.completedFuture(new VoteResult(
                     pollId,
-                    VoteResult.Status.REJECTED_RULES,
+                    VoteResult.Status.NO_OP,
                     before,
-                    "<red>You already voted. Resubmissions are disabled</red>"
+                    "<gray>No change</gray>"
             ));
+        }
+
+        // Resubmission policy
+        if (!effective.allowResubmissions()) {
+            if (effective.multipleChoice()) {
+                // Disallow removals; allow additions up to max
+                boolean isRemoval = !proposed.containsAll(before); // any element removed?
+                if (isRemoval) {
+                    releaseInFlight(pollId, playerId);
+                    return CompletableFuture.completedFuture(new VoteResult(
+                            pollId,
+                            VoteResult.Status.REJECTED_RULES,
+                            before,
+                            "<red>You can't unselect after voting (resubmissions disabled)</red>"
+                    ));
+                }
+            } else {
+                // Single-choice: once selected, you can't switch
+                if (!before.isEmpty() && !before.equals(proposed)) {
+                    releaseInFlight(pollId, playerId);
+                    return CompletableFuture.completedFuture(new VoteResult(
+                            pollId,
+                            VoteResult.Status.REJECTED_RULES,
+                            before,
+                            "<red>You already voted. Changing your choice is disabled</red>"
+                    ));
+                }
+            }
         }
 
         // Max selections
@@ -101,16 +128,6 @@ public class DefaultVoteManager implements VoteManager {
                         "<red>You can select at most " + max + " option" + (max == 1 ? "" : "s") + "</red>"
                 ));
             }
-        }
-
-        if (before.equals(proposed)) {
-            releaseInFlight(pollId, playerId);
-            return CompletableFuture.completedFuture(new VoteResult(
-                    pollId,
-                    VoteResult.Status.NO_OP,
-                    before,
-                    "<gray>No change</gray>"
-            ));
         }
 
         // Optimistic apply to runtime

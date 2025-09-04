@@ -242,7 +242,7 @@ public final class GeneralScreen implements PollBuildScreen {
                     .build(),
 
             DialogInput.bool(K_ALLOW_RESUBMIT,
-                            Component.text("Allow Resubmission (single-answer only)"))
+                            Component.text("Allow Resubmission"))
                     .initial(session.isAllowResubmission())
                     .build(),
 

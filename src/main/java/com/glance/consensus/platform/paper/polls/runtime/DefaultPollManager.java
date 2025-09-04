@@ -186,8 +186,8 @@ public final class DefaultPollManager implements PollManager {
 
                 Component msg = Mini.parseMini(
                     "<newline>" +
-                    "<gray>Poll:<b><newline><white>\"</white>" + poll.getQuestionRaw() +
-                    "<white>\"</white><newline></b>Has now <red><u>closed</u></red></gray><newline>" +
+                    "<gray>Poll:<newline><white>\"</white><b>" + poll.getQuestionRaw() +
+                    "</b><white>\"</white><newline>Has now <red><u>closed</u></red><newline>" +
                     "<hover:show_text:'<green>Click to view results</green>'>" +
                     "<click:run_command:'/poll results " + poll.getPollIdentifier() + "'>" +
                     "<aqua>[View Results]</aqua>" +

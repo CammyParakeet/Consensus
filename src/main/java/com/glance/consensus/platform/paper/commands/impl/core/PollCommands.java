@@ -17,6 +17,7 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.JoinConfiguration;
+import net.kyori.adventure.text.event.ClickEvent;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.incendo.cloud.annotations.Argument;
@@ -252,16 +253,18 @@ public class PollCommands implements CommandHandler {
 
                 String timeBit;
                 if (closed) {
-                    // If later you track a distinct closedAt, show it here. For now show scheduled closesAt.
                     timeBit = "closed at <aqua>" + fmt(p.getClosesAt()) + "</aqua>";
                 } else {
                     var left = Duration.between(now, p.getClosesAt());
                     timeBit = "closes in <aqua>" + PollTextBuilder.formatDuration(left) + "</aqua>";
                 }
 
-                Component row = mm("<yellow>" + (i++) + ".</yellow> " + status + " "
-                        + "<white>" + p.getQuestionRaw() + "</white> "
-                        + "<gray>[id: " + p.getId() + "]</gray> <dark_gray>•</dark_gray> " + timeBit);
+                Component row = Component.text()
+                        .append(mm("<yellow>" + (i++) + ".</yellow> " + status + " "))
+                        .append(mm("<white>" + p.getQuestionRaw() + "</white> "))
+                        .append(idChip(p.getPollIdentifier()))
+                        .append(mm(" <dark_gray>•</dark_gray> " + timeBit))
+                        .build();
 
                 lines.add(row);
             }
@@ -299,10 +302,16 @@ public class PollCommands implements CommandHandler {
         }
     }
 
+    private Component idChip(@NotNull String id) {
+        return mm("<gray>[id: <aqua>" + id + "</aqua>]</gray>")
+                .hoverEvent(mm("<yellow>Click to copy</yellow>"))
+                .clickEvent(ClickEvent.copyToClipboard(id));
+    }
+
     private Optional<UUID> resolvePollId(String raw) {
         if ("latest".equalsIgnoreCase(raw)) {
             return manager.active().stream()
-                .min(Comparator.comparing(rt -> rt.getPoll().getClosesAt()))
+                .min(Comparator.comparing(rt -> rt.getPoll().getCreatedAt()))
                 .map(rt -> rt.getPoll().getId());
         }
 

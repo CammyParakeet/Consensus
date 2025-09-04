@@ -223,7 +223,7 @@ public final class BookPollDisplay implements PollDisplay {
                 .build();
 
         var hover = Component.text()
-                .append(Mini.parseMini("<white><bold>" + opt.labelRaw() + "</bold></white>"))
+                .append(Mini.parseMini("<white><bold>" + opt.labelRaw() + "<reset>"))
                 .append(Component.text("\n"));
 
         if (!ComponentUtils.isVisuallyEmpty(tooltip)) {

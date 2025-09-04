@@ -160,7 +160,7 @@ public class PollsMenu {
             meta.displayName(parsed);
 
             // Lore = activity lines (badge + closes/closed info)
-            meta.lore(activityLore(rt.getPoll()));
+            meta.lore(PollTextBuilder.activityLore(rt.getPoll(), true));
 
             if (closed) meta.setEnchantmentGlintOverride(true);
         });
@@ -170,43 +170,7 @@ public class PollsMenu {
             .asGuiItem((p, ctx) -> this.navigator.openVoting(p, rt));
     }
 
-    private @NotNull List<Component> activityLore(@NotNull Poll poll) {
-        List<Component> out = new ArrayList<>(4);
-        out.add(Component.empty());
 
-        final String stateLabel = poll.isClosed() ? "Closed" : "Open";
-        out.add(Mini.parseMini(
-                VoteBadgeUtils.buildBadge(stateLabel, !poll.isClosed(), VoteBadgeUtils.Theme.defaultActivity())
-        ));
-
-        final Instant now = Instant.now();
-        if (!poll.isClosed()) {
-            final Instant closesAt = poll.getClosesAt();
-            if (now.isBefore(closesAt)) {
-                final Duration remaining = Duration.between(now, closesAt);
-                out.add(Mini.parseMini("<gray>Closes in:</gray> <yellow>" + PollTextBuilder.formatDuration(remaining) + "</yellow>"));
-            }
-        } else {
-            final Instant closedAt = poll.getClosesAt();
-            final Duration since = Duration.between(closedAt, now).abs();
-            out.add(Mini.parseMini("<gray>Closed:</gray> <yellow>" + briefAgo(since) + " ago</yellow>"));
-        }
-
-        return out.stream()
-            .map(c -> c.decoration(TextDecoration.ITALIC, false))
-            .toList();
-    }
-
-    private static @NotNull String briefAgo(@NotNull Duration d) {
-        long s = Math.max(0, d.getSeconds());
-        long days = s / 86400; s %= 86400;
-        long hrs  = s / 3600;  s %= 3600;
-        long mins = s / 60;
-        if (days > 0) return days + "d";
-        if (hrs  > 0) return hrs  + "h";
-        if (mins > 0) return mins + "m";
-        return "now";
-    }
 
     /** Border everywhere - inner grid + buttons */
     private void fillBorder(GuiContainer<Player, ItemStack> container) {

@@ -172,6 +172,11 @@ public final class DefaultPollManager implements PollManager {
         return opt.isEmpty() ? Set.of() : opt.get().votersSnapshot();
     }
 
+    @Override
+    public void clearLocal(@NotNull UUID pollId) {
+        this.polls.remove(pollId);
+    }
+
     private boolean safeClose(@NotNull Poll poll, Instant closeTime) {
         UUID pollId = poll.getId();
         storageProvider.get().closePoll(pollId, closeTime)

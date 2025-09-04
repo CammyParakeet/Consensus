@@ -204,8 +204,11 @@ public class PollCommands implements CommandHandler {
                 sender.sendMessage("Unknown poll " + id);
                 return null;
             })
-            .thenRun(() ->
-                sender.sendMessage("Deleted poll " + id));
+            .thenRun(() -> {
+                this.manager.clearLocal(targetId.get());
+                sender.sendMessage("Deleted poll " + id);
+            });
+
     }
 
     @Command("poll list [option]")

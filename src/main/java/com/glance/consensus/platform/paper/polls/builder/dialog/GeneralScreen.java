@@ -45,10 +45,8 @@ public final class GeneralScreen implements PollBuildScreen {
     private static final String K_ALLOW_RESUBMIT = "allow_resubmit";
     private static final String K_HIDE_RESULTS = "hide_results";
 
-    private static final String K_BUMP_DELTA = "delta";
-
     private static final Component OPTION_EDIT_SUFFIX = Mini.parseMini(
-            "<gold>[</gold><#0d9fbd>Click to edit this answer<gold>]");
+            "<reset><gold>[</gold><#0d9fbd>Click to edit this answer<gold>]");
 
     @Inject
     public GeneralScreen(
@@ -110,6 +108,7 @@ public final class GeneralScreen implements PollBuildScreen {
         if (question == null || question.isBlank()) {
             return;
         }
+        session.setQuestionRaw(question);
 
         // Duration
         String presetId = view.getText(K_PRESET_DURATION);
@@ -128,23 +127,20 @@ public final class GeneralScreen implements PollBuildScreen {
         // Answer flags
         Boolean multipleRaw = view.getBoolean(K_MULTI_CHOICE);
         boolean multiple = multipleRaw != null ? multipleRaw : false;
+        session.setMultipleChoice(multiple);
 
         int optionCount = Math.max(1, session.answerCount());
         Float maxSelRaw = view.getFloat(K_MAX_SELECTIONS);
         int maxSel = (int) Math.max(1, Math.min(optionCount, (maxSelRaw != null) ? maxSelRaw.intValue() : 1F));
         if (!multiple) maxSel = 1;
+        session.setMaxSelections(maxSel);
 
         Boolean allowResubmitRaw = view.getBoolean(K_ALLOW_RESUBMIT);
         boolean allowResubmit = allowResubmitRaw != null ? allowResubmitRaw : true;
+        session.setAllowResubmission(allowResubmit);
 
         Boolean hideResults = view.getBoolean(K_HIDE_RESULTS);
         boolean showResults = hideResults == null || !hideResults;
-
-        // Update session
-        session.setQuestionRaw(question);
-        session.setMultipleChoice(multiple);
-        session.setMaxSelections(maxSel);
-        session.setAllowResubmission(allowResubmit);
         session.setViewResults(showResults);
     }
 
@@ -158,10 +154,12 @@ public final class GeneralScreen implements PollBuildScreen {
             var label = Mini.parseMini(opt.labelRaw());
             Component tooltip;
             if (opt.tooltipRaw() != null && !opt.tooltipRaw().isBlank()) {
-                tooltip = Mini.parseMini(opt.tooltipRaw())
-                        .appendNewline()
-                        .appendNewline()
-                        .append(OPTION_EDIT_SUFFIX);
+                tooltip = Component.text()
+                    .append(Mini.parseMini(opt.tooltipRaw()))
+                    .appendNewline()
+                    .appendNewline()
+                    .append(OPTION_EDIT_SUFFIX)
+                    .build();
             } else {
                 tooltip = OPTION_EDIT_SUFFIX;
             }

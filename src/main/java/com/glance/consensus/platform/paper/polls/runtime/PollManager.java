@@ -102,4 +102,6 @@ public interface PollManager extends Manager {
      */
     Set<UUID> findVoters(@NotNull UUID pollId);
 
+    void clearLocal(@NotNull UUID pollId);
+
 }

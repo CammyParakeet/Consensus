@@ -3,6 +3,8 @@
 **Consensus** is a Minecraft (Paper 1.21.6) plugin for creating and managing in-game polls  
 Players can vote through interactive **books**, view results in real time, and server staff can configure persistence backends (FlatFile or SQL)
 
+[Showcase](https://acute-hortensia-df3.notion.site/Consensus-262b4ae6539780a595a5e9367d20b765)
+
 ---
 
 ## Features
